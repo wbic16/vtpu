@@ -1,0 +1,10 @@
+[package]
+name = "vtpu"
+version = "0.1.0"
+edition = "2021"
+description = "Virtual Tensor Processing Unit — sentron-native compute on AMD R9"
+license = "MIT"
+repository = "https://github.com/wbic16/vtpu"
+
+[dependencies]
+# Zero external deps for Phase 0. Hardware just needs good software.
