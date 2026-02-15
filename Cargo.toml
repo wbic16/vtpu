@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Ranch Choir <will@phext.io>"]
 license = "MIT"
 description = "vTPU: Software-defined virtual TPU with phext-native addressing"
-repository = "https://github.com/wbic16/vtpu-runtime"
+repository = "https://github.com/wbic16/vtpu"
 
 [dependencies]
 # Performance monitoring (TODO Wave 3: integrate perf counters)
