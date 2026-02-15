@@ -52,6 +52,7 @@ pub mod pipes;
 pub mod phext_coord;
 pub mod telemetry;
 pub mod bitnet;
+pub mod cosmology;
 pub mod packer;
 pub mod regalloc;
 pub mod scheduler;
