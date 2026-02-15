@@ -1,0 +1,15 @@
+[package]
+name = "sparse_attention_bench"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "sparse_attention_bench"
+path = "src/lib.rs"
+
+[[bench]]
+name = "sparse_attention"
+harness = false
+
+[dev-dependencies]
+criterion = "0.5"
