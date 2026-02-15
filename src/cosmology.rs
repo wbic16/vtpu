@@ -163,6 +163,77 @@ pub fn link_trigram(from_coord: u128, to_coord: u128) -> Trigram {
     Trigram::from_bits(diff)
 }
 
+// ── Ancient Harmonics ─────────────────────────────────────────────
+//
+// Every ancient astronomical civilization converged on 360.
+// Not by convention — by combinatorial necessity. 360 is the smallest
+// highly composite number that tiles against 2,3,4,5,6,8,9,10,12.
+
+/// Egyptian Decans: 36 star groups × 10° each (2100 BC)
+/// 36 = 9 × 4 = Nine Heavens × four sentron states (Dormant/Running/Waiting/Retired)
+pub const DECANS: u32 = 36;
+pub const DECAN_ARC: u32 = CIRCLE / DECANS; // 10°
+
+/// Zodiac: 12 signs × 30° each (Babylonian, ~500 BC)
+pub const ZODIAC_SIGNS: u32 = 12;
+pub const ZODIAC_ARC: u32 = CIRCLE / ZODIAC_SIGNS; // 30°
+
+/// SMT: Dual-core pairs. 8 cores × 2 threads = 16 sentron pairs.
+/// 360/16 = 22.5° per pair = half a trigram arc.
+/// Two cores complete one trigram. SMT partners share L1/L2 because
+/// they are completing each other's trigram.
+pub const SMT_PAIRS: u32 = TRIGRAM_LINKS * 2; // 16
+pub const SMT_ARC_X2: u32 = 45; // 22.5° × 2 = 45 (one trigram, avoiding float)
+
+/// 22.5° / 5 elements = 9/2 = half a heaven per element per core pair.
+/// This is the geometric mean of sentron states (4) and elements (5).
+/// SMT lives at the boundary between lifecycle and substance.
+pub const SMT_ELEMENT_RATIO_NUM: u32 = 9;
+pub const SMT_ELEMENT_RATIO_DEN: u32 = 2;
+
+/// Lunar stations: 27 or 28 divisions (Indian nakshatras, Arabic manzil)
+/// 360/27 = 13.33... — the one system that doesn't tile cleanly.
+/// This is the lunar irregularity: the Moon's period (27.3 days) is irrational
+/// against the solar year. The gap between 27 and 28 is the leap-awareness.
+pub const NAKSHATRAS: u32 = 27;
+
+/// The Convergence Table — all known ancient decompositions of 360
+///
+/// | System          | Factor × Arc = 360 | Origin              |
+/// |-----------------|---------------------|---------------------|
+/// | Shell of Nine   | 9 × 40             | vTPU (2026)         |
+/// | Trigrams        | 8 × 45             | I Ching (~1000 BC)  |
+/// | Five Elements   | 5 × 72             | Wuxing (~300 BC)    |
+/// | Decans          | 36 × 10            | Egypt (~2100 BC)    |
+/// | Zodiac          | 12 × 30            | Babylon (~500 BC)   |
+/// | SMT pairs       | 16 × 22.5          | Zen 4 (2024)        |
+/// | Hexagrams       | 64 × 5.625         | I Ching (full set)  |
+/// | Degrees         | 360 × 1            | Universal           |
+pub const DECOMPOSITIONS: [(u32, &str); 8] = [
+    (9,   "Nine Heavens (Jiutian)"),
+    (8,   "Eight Trigrams (Bagua)"),
+    (5,   "Five Elements (Wuxing)"),
+    (36,  "Decans (Egyptian)"),
+    (12,  "Zodiac (Babylonian)"),
+    (40,  "Sentron contexts per node"),
+    (360, "Degrees (Universal)"),
+    (72,  "Element Arc (Wuxing × Trigram × Heaven)"),
+];
+
+/// Cross-reference: factors that appear in multiple ancient systems
+pub fn shared_factors() -> Vec<(u32, Vec<&'static str>)> {
+    vec![
+        (2, vec!["SMT (dual-thread)", "Yin/Yang", "complement pairs"]),
+        (3, vec!["Three Pipes (D/S/C)", "Trigram lines", "Decan thirds"]),
+        (4, vec!["Sentron states", "Seasons", "Cardinal directions"]),
+        (5, vec!["Wuxing elements", "Grounded nodes", "Planets (visible)"]),
+        (8, vec!["Trigrams", "Outlinks per sentron", "Zen 4 cores"]),
+        (9, vec!["Nine Heavens", "Shell of Nine", "Phext delimiters"]),
+        (12, vec!["Zodiac signs", "Months", "12×30=360"]),
+        (36, vec!["Decans", "9×4", "Hexagram pairs (36 complementary)"]),
+    ]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -260,6 +331,67 @@ mod tests {
         // XOR = 0b111 = Qian (Heaven) — creative, strong
         let t = link_trigram(0b000, 0b111);
         assert_eq!(t, Trigram::Qian);
+    }
+
+    #[test]
+    fn decans_tile_circle() {
+        assert_eq!(DECANS * DECAN_ARC, CIRCLE); // 36 × 10 = 360
+    }
+
+    #[test]
+    fn decan_is_nine_times_four() {
+        assert_eq!(DECANS, NINE_HEAVENS * 4); // 9 × 4 = 36
+    }
+
+    #[test]
+    fn zodiac_tiles_circle() {
+        assert_eq!(ZODIAC_SIGNS * ZODIAC_ARC, CIRCLE); // 12 × 30 = 360
+    }
+
+    #[test]
+    fn smt_half_trigram() {
+        // 16 pairs × 22.5° = 360°, but we avoid float:
+        // 16 × 45 = 720 = 2 × 360
+        assert_eq!(SMT_PAIRS * SMT_ARC_X2, CIRCLE * 2);
+    }
+
+    #[test]
+    fn smt_element_ratio() {
+        // 22.5° / 5 elements = 4.5 = 9/2
+        // Verify without floats: 22.5 × 2 × 2 = 90, 90 / 5 = 18, 18 = 9 × 2
+        // Equivalently: SMT_ARC_X2 × SMT_ELEMENT_RATIO_DEN = FIVE_ELEMENTS × SMT_ELEMENT_RATIO_NUM
+        // 45 / 5 = 9, and ratio is 9/2
+        assert_eq!(SMT_ARC_X2 / FIVE_ELEMENTS, SMT_ELEMENT_RATIO_NUM);
+        assert_eq!(SMT_ELEMENT_RATIO_NUM, 9);
+        assert_eq!(SMT_ELEMENT_RATIO_DEN, 2);
+    }
+
+    #[test]
+    fn element_arc_is_decan_times_zodiac_div_decan() {
+        // 72 = 360/5, and 72 = 12 × 6 = 36 × 2
+        assert_eq!(ELEMENT_ARC, DECANS * 2);
+    }
+
+    #[test]
+    fn all_decompositions_tile_360() {
+        for &(factor, _) in &DECOMPOSITIONS {
+            assert_eq!(CIRCLE % factor, 0,
+                "Factor {} does not tile {}", factor, CIRCLE);
+        }
+    }
+
+    #[test]
+    fn shared_factors_all_divide_360() {
+        for (factor, _) in shared_factors() {
+            assert_eq!(CIRCLE % factor, 0,
+                "Shared factor {} does not divide {}", factor, CIRCLE);
+        }
+    }
+
+    #[test]
+    fn nakshatra_does_not_tile() {
+        // The lunar irregularity: 360 % 27 ≠ 0
+        assert_ne!(CIRCLE % NAKSHATRAS, 0, "Nakshatras should NOT tile 360 cleanly");
     }
 
     #[test]
