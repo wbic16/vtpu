@@ -63,6 +63,14 @@ pub fn extract_accesses(siw: &SIW) -> RegAccess {
         DenseOp::DMOV { rd, .. } => {
             acc.writes.push((RegClass::General, *rd));
         }
+        DenseOp::DTERNARY { rd, rs1, trit_reg } | DenseOp::DTACC { rd, rs1, trit_reg } => {
+            acc.reads.extend([(RegClass::General, *rs1), (RegClass::General, *trit_reg)]);
+            acc.writes.push((RegClass::General, *rd));
+        }
+        DenseOp::DTPOP { rd, rs } => {
+            acc.reads.push((RegClass::General, *rs));
+            acc.writes.push((RegClass::General, *rd));
+        }
         DenseOp::DHDENC { rd, rs, .. } | DenseOp::DHDPERM { rd, rs, .. } => {
             acc.reads.push((RegClass::General, *rs));
             acc.writes.push((RegClass::General, *rd));

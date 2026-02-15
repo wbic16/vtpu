@@ -28,6 +28,9 @@ impl fmt::Display for DenseOp {
             DenseOp::DHDBUND { rd, rs1, rs2 } => write!(f, "hdbund r{} <- r{} + r{}", rd, rs1, rs2),
             DenseOp::DHDPERM { rd, rs, k } => write!(f, "hdperm r{} <- r{} >> {}", rd, rs, k),
             DenseOp::DHDSIM { rd, rs1, rs2 } => write!(f, "hdsim r{} <- cos(r{}, r{})", rd, rs1, rs2),
+            DenseOp::DTERNARY { rd, rs1, trit_reg } => write!(f, "ternary r{} <- r{} * trits(r{})", rd, rs1, trit_reg),
+            DenseOp::DTPOP { rd, rs } => write!(f, "tpop r{} <- popcount(r{})", rd, rs),
+            DenseOp::DTACC { rd, rs1, trit_reg } => write!(f, "tacc r{} += r{} * trits(r{})", rd, rs1, trit_reg),
             DenseOp::DNOP => write!(f, "nop"),
         }
     }

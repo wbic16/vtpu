@@ -41,6 +41,19 @@ pub enum DenseOp {
     DHDBUND { rd: u8, rs1: u8, rs2: u8 },
     DHDPERM { rd: u8, rs: u8, k: u16 },
     DHDSIM { rd: u8, rs1: u8, rs2: u8 },
+
+    // v0.3: BitNet Ternary Mode — weights are {-1, 0, 1}, no FPU needed
+    /// rd = ternary_select(rs1, trit_reg): apply packed trits to activation
+    /// trit_reg holds packed 2-bit trits: 00=zero, 01=+1, 10=-1
+    /// Result: sum of (activation[i] * trit[i]) across packed elements
+    DTERNARY { rd: u8, rs1: u8, trit_reg: u8 },
+
+    /// rd = popcount of non-zero trits in rs (sparsity measure)
+    DTPOP { rd: u8, rs: u8 },
+
+    /// rd = ternary accumulate: rd += ternary_select(rs1, trit_reg)
+    DTACC { rd: u8, rs1: u8, trit_reg: u8 },
+
     DNOP,
 }
 

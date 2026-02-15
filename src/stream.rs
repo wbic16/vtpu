@@ -112,6 +112,8 @@ fn reads_register(op: &DenseOp, reg: u8) -> bool {
         DenseOp::DHDENC { rs, .. } => *rs == reg,
         DenseOp::DHDBIND { rs1, rs2, .. } | DenseOp::DHDBUND { rs1, rs2, .. } | DenseOp::DHDSIM { rs1, rs2, .. } => *rs1 == reg || *rs2 == reg,
         DenseOp::DHDPERM { rs, .. } => *rs == reg,
+        DenseOp::DTERNARY { rs1, trit_reg, .. } | DenseOp::DTACC { rs1, trit_reg, .. } => *rs1 == reg || *trit_reg == reg,
+        DenseOp::DTPOP { rs, .. } => *rs == reg,
         DenseOp::DMOV { .. } | DenseOp::DNOP => false,
     }
 }
@@ -148,7 +150,7 @@ fn get_write_register(op: &DenseOp) -> Option<u8> {
         DenseOp::DCMP { rd, .. } |
         DenseOp::DRED { rd, .. } |
         DenseOp::DSEL { rd, .. } |
-        DenseOp::DHDENC { rd, .. } | DenseOp::DHDBIND { rd, .. } | DenseOp::DHDBUND { rd, .. } | DenseOp::DHDPERM { rd, .. } | DenseOp::DHDSIM { rd, .. } | DenseOp::DMOV { rd, .. } => Some(*rd),
+        DenseOp::DHDENC { rd, .. } | DenseOp::DHDBIND { rd, .. } | DenseOp::DHDBUND { rd, .. } | DenseOp::DHDPERM { rd, .. } | DenseOp::DHDSIM { rd, .. } | DenseOp::DTERNARY { rd, .. } | DenseOp::DTPOP { rd, .. } | DenseOp::DTACC { rd, .. } | DenseOp::DMOV { rd, .. } => Some(*rd),
         DenseOp::DNOP => None,
     }
 }

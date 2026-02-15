@@ -55,6 +55,23 @@ impl ExecStats {
     }
 }
 
+/// Apply packed ternary weights to an activation value.
+/// Trits are packed 2 bits each: 00=zero, 01=+1, 10=-1 (32 trits per u64).
+/// Returns: sum of (activation * trit[i]) for each non-zero trit.
+#[inline]
+fn ternary_apply(activation: i64, trits: u64) -> i64 {
+    let mut result = 0i64;
+    for i in 0..32 {
+        let trit = (trits >> (i * 2)) & 0x3;
+        match trit {
+            0b01 => result += activation,  // +1
+            0b10 => result -= activation,  // -1
+            _ => {}                         // 0 or unused
+        }
+    }
+    result
+}
+
 /// Execute one SIW against a sentron's register file. Returns active op count (0-3).
 fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
     let mut active = 0u8;
@@ -132,6 +149,28 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
             let a = sentron.regs.general[rs1 as usize];
             let b = sentron.regs.general[rs2 as usize];
             sentron.regs.general[rd as usize] = (!(a ^ b)).count_ones() as i64;
+            active += 1;
+        }
+        DenseOp::DTERNARY { rd, rs1, trit_reg } => {
+            let activation = sentron.regs.general[rs1 as usize];
+            let trits = sentron.regs.general[trit_reg as usize] as u64;
+            sentron.regs.general[rd as usize] = ternary_apply(activation, trits);
+            active += 1;
+        }
+        DenseOp::DTPOP { rd, rs } => {
+            let trits = sentron.regs.general[rs as usize] as u64;
+            // Count non-zero trits (2 bits each, 32 trits per i64)
+            let mut count = 0i64;
+            for i in 0..32 {
+                if (trits >> (i * 2)) & 0x3 != 0 { count += 1; }
+            }
+            sentron.regs.general[rd as usize] = count;
+            active += 1;
+        }
+        DenseOp::DTACC { rd, rs1, trit_reg } => {
+            let activation = sentron.regs.general[rs1 as usize];
+            let trits = sentron.regs.general[trit_reg as usize] as u64;
+            sentron.regs.general[rd as usize] += ternary_apply(activation, trits);
             active += 1;
         }
     }
