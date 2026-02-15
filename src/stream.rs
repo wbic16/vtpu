@@ -109,6 +109,9 @@ fn reads_register(op: &DenseOp, reg: u8) -> bool {
         DenseOp::DCMP { rs1, rs2, .. } => *rs1 == reg || *rs2 == reg,
         DenseOp::DRED { rs1, .. } => *rs1 == reg,
         DenseOp::DSEL { rs1, rs2, .. } => *rs1 == reg || *rs2 == reg,
+        DenseOp::DHDENC { rs, .. } => *rs == reg,
+        DenseOp::DHDBIND { rs1, rs2, .. } | DenseOp::DHDBUND { rs1, rs2, .. } | DenseOp::DHDSIM { rs1, rs2, .. } => *rs1 == reg || *rs2 == reg,
+        DenseOp::DHDPERM { rs, .. } => *rs == reg,
         DenseOp::DMOV { .. } | DenseOp::DNOP => false,
     }
 }
@@ -145,7 +148,7 @@ fn get_write_register(op: &DenseOp) -> Option<u8> {
         DenseOp::DCMP { rd, .. } |
         DenseOp::DRED { rd, .. } |
         DenseOp::DSEL { rd, .. } |
-        DenseOp::DMOV { rd, .. } => Some(*rd),
+        DenseOp::DHDENC { rd, .. } | DenseOp::DHDBIND { rd, .. } | DenseOp::DHDBUND { rd, .. } | DenseOp::DHDPERM { rd, .. } | DenseOp::DHDSIM { rd, .. } | DenseOp::DMOV { rd, .. } => Some(*rd),
         DenseOp::DNOP => None,
     }
 }
@@ -156,7 +159,7 @@ fn get_sparse_write_register(op: &SparseOp) -> Option<u8> {
         SparseOp::SGATHER { rd, .. } |
         SparseOp::SINDEX { rd, .. } |
         SparseOp::SDEDUP { rd, .. } |
-        SparseOp::SALLOC { rd, .. } => Some(*rd),
+        SparseOp::SASSOC { rd, .. } | SparseOp::SROUTE { rd, .. } | SparseOp::SNEIGHBR { rd, .. } | SparseOp::SALLOC { rd, .. } => Some(*rd),
         _ => None,
     }
 }

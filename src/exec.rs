@@ -120,6 +120,19 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW) -> u8 {
             sentron.regs.general[rd as usize] = imm;
             active += 1;
         }
+        DenseOp::DHDENC { rd, rs, .. } |
+        DenseOp::DHDBIND { rd, rs1: rs, .. } |
+        DenseOp::DHDBUND { rd, rs1: rs, .. } |
+        DenseOp::DHDPERM { rd, rs, .. } => {
+            sentron.regs.general[rd as usize] = sentron.regs.general[rs as usize];
+            active += 1;
+        }
+        DenseOp::DHDSIM { rd, rs1, rs2 } => {
+            let a = sentron.regs.general[rs1 as usize];
+            let b = sentron.regs.general[rs2 as usize];
+            sentron.regs.general[rd as usize] = (!(a ^ b)).count_ones() as i64;
+            active += 1;
+        }
     }
 
     // ── S-Pipe ──
@@ -152,6 +165,10 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW) -> u8 {
             active += 1;
         }
         SparseOp::SFREE { .. } => { active += 1; }
+        SparseOp::SASSOC { rd, .. } | SparseOp::SROUTE { rd, .. } | SparseOp::SNEIGHBR { rd, .. } => {
+            sentron.regs.general[rd as usize] = 0;
+            active += 1;
+        }
     }
 
     // ── C-Pipe ──
@@ -182,6 +199,11 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW) -> u8 {
             active += 1;
         }
         CoordOp::CCAST { .. } => { active += 1; }
+        CoordOp::CSLICE { .. } | CoordOp::CFANOUT { .. } => { active += 1; }
+        CoordOp::CMERGE { rd, .. } => {
+            sentron.regs.general[rd as usize] = 0;
+            active += 1;
+        }
     }
 
     active

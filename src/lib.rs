@@ -58,10 +58,12 @@ pub mod validation;
 pub mod ppt;
 pub mod sentron;
 pub mod exec;
+pub mod hdc;
 pub mod analysis;
 
 pub use siw::SIW;
-pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope};
+pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
+pub use hdc::{HyperVector, AssociativeMemory, HDC_DEFAULT_WIDTH};
 pub use phext_coord::PhextCoord;
 pub use telemetry::VtpuTelemetry;
 pub use scheduler::Scheduler;

@@ -35,6 +35,12 @@ pub enum DenseOp {
     DMOV { rd: u8, imm: i64 },
     
     /// No dense operation this cycle
+    // v0.2: Hyperdimensional Computing
+    DHDENC { rd: u8, rs: u8, width: u16 },
+    DHDBIND { rd: u8, rs1: u8, rs2: u8 },
+    DHDBUND { rd: u8, rs1: u8, rs2: u8 },
+    DHDPERM { rd: u8, rs: u8, k: u16 },
+    DHDSIM { rd: u8, rs1: u8, rs2: u8 },
     DNOP,
 }
 
@@ -73,8 +79,15 @@ pub enum SparseOp {
     SFREE { coord_idx: u8, size: u32 },
     
     /// No sparse operation this cycle
+    // v0.2: Associative & Routing
+    SASSOC { rd: u8, coord_reg: u8, match_mode: MatchMode },
+    SROUTE { rd: u8, embedding_reg: u8, dim_mask: u16 },
+    SNEIGHBR { rd: u8, coord_reg: u8, radius: u8 },
     SNOP,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MatchMode { First, All, Nearest, Count }
 
 /// Coordination Pipeline Operations (Inter-sentron communication)
 ///
@@ -106,8 +119,15 @@ pub enum CoordOp {
     CCAST { rs: u8, group: u8 },
     
     /// No coordination operation this cycle
+    // v0.2: Attention Geometry
+    CSLICE { group: u8, dim_triple: [u8; 3], range_start: u16, range_end: u16 },
+    CFANOUT { msg_reg: u8, coord_pattern: u8 },
+    CMERGE { rd: u8, group: u8, op: MergeOp },
     CNOP,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MergeOp { Concat, Sum, Max, Vote }
 
 /// Reduction operation types
 #[derive(Debug, Clone, Copy, PartialEq)]

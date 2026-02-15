@@ -23,6 +23,11 @@ impl fmt::Display for DenseOp {
             DenseOp::DRED { rd, rs1, op } => write!(f, "red r{} ← {}(r{})", rd, op, rs1),
             DenseOp::DSEL { rd, rs1, rs2, flags } => write!(f, "sel r{} ← r{} : r{} [{}]", rd, rs1, rs2, flags),
             DenseOp::DMOV { rd, imm } => write!(f, "mov r{} ← {}", rd, imm),
+            DenseOp::DHDENC { rd, rs, width } => write!(f, "hdenc r{} <- r{} ({}w)", rd, rs, width),
+            DenseOp::DHDBIND { rd, rs1, rs2 } => write!(f, "hdbind r{} <- r{} ^ r{}", rd, rs1, rs2),
+            DenseOp::DHDBUND { rd, rs1, rs2 } => write!(f, "hdbund r{} <- r{} + r{}", rd, rs1, rs2),
+            DenseOp::DHDPERM { rd, rs, k } => write!(f, "hdperm r{} <- r{} >> {}", rd, rs, k),
+            DenseOp::DHDSIM { rd, rs1, rs2 } => write!(f, "hdsim r{} <- cos(r{}, r{})", rd, rs1, rs2),
             DenseOp::DNOP => write!(f, "nop"),
         }
     }
@@ -39,6 +44,9 @@ impl fmt::Display for SparseOp {
             SparseOp::SFLUSH { coord_idx, width } => write!(f, "flush phext[c{}] ({}B)", coord_idx, width),
             SparseOp::SALLOC { rd, size, dim_mask } => write!(f, "alloc r{} ← {} bytes @ dims {:011b}", rd, size, dim_mask),
             SparseOp::SFREE { coord_idx, size } => write!(f, "free phext[c{}] ({} bytes)", coord_idx, size),
+            SparseOp::SASSOC { rd, coord_reg, match_mode } => write!(f, "assoc r{} <- c{} {:?}", rd, coord_reg, match_mode),
+            SparseOp::SROUTE { rd, embedding_reg, dim_mask } => write!(f, "route r{} <- r{} @{:011b}", rd, embedding_reg, dim_mask),
+            SparseOp::SNEIGHBR { rd, coord_reg, radius } => write!(f, "neighbr r{} <- c{} r={}", rd, coord_reg, radius),
             SparseOp::SNOP => write!(f, "nop"),
         }
     }
@@ -55,6 +63,9 @@ impl fmt::Display for CoordOp {
             CoordOp::CFENCE { scope } => write!(f, "fence {}", scope),
             CoordOp::CREDUCE { rd, rs, op, group } => write!(f, "reduce r{} ← {}(r{}) @ group{}", rd, op, rs, group),
             CoordOp::CCAST { rs, group } => write!(f, "broadcast r{} → group{}", rs, group),
+            CoordOp::CSLICE { group, dim_triple, range_start, range_end } => write!(f, "slice grp{} d({},{},{}) {}..{}", group, dim_triple[0], dim_triple[1], dim_triple[2], range_start, range_end),
+            CoordOp::CFANOUT { msg_reg, coord_pattern } => write!(f, "fanout r{} -> c{}", msg_reg, coord_pattern),
+            CoordOp::CMERGE { rd, group, op } => write!(f, "merge r{} <- grp{} {:?}", rd, group, op),
             CoordOp::CNOP => write!(f, "nop"),
         }
     }
