@@ -73,6 +73,24 @@ cargo run --example validation_demo
 cargo bench
 ```
 
+---
+
+## 📚 Documentation
+
+**[Complete technical specification and research →](docs/)**
+
+Wave 1 & 2 documentation (86.7 KB):
+- Geometric foundations (why phext coordinates work)
+- Hard problems solved (2-81,000× speedups)
+- Instruction set (10 operations)
+- Concrete examples (GPT-4 attention, MoE, knowledge graphs)
+- Memory layout (hash table + distributed cluster)
+- Python client library + benchmarks
+
+**Start here:** [W2 Onboarding Guide](docs/wave-2/R23-W2-ONBOARDING.md)
+
+---
+
 ## Quick Start
 
 ### 1. Basic SIW Creation
