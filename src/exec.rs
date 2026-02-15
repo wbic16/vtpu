@@ -4,6 +4,7 @@
 //! register file. Measures ops/cycle assuming ideal 3-wide retirement.
 
 use crate::pipes::{DenseOp, SparseOp, CoordOp, ReductionOp};
+use crate::memory::Memory;
 use crate::sentron::{Sentron, SentronState};
 use crate::siw::SIW;
 
@@ -55,7 +56,7 @@ impl ExecStats {
 }
 
 /// Execute one SIW against a sentron's register file. Returns active op count (0-3).
-fn exec_siw(sentron: &mut Sentron, siw: &SIW) -> u8 {
+fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
     let mut active = 0u8;
 
     // ── D-Pipe ──
@@ -149,12 +150,16 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW) -> u8 {
         }
         SparseOp::SPREFCH { .. } => { active += 1; }
         SparseOp::SGATHER { rd, coord_idx, .. } => {
-            // Phase 0: no real memory backing. Store coord hash as placeholder.
-            let (lo, _hi) = sentron.regs.phext[coord_idx as usize].as_raw();
-            sentron.regs.general[rd as usize] = lo as i64;
+            let coord = sentron.regs.phext[coord_idx as usize];
+            sentron.regs.general[rd as usize] = mem.gather_i64(&coord);
             active += 1;
         }
-        SparseOp::SSCATTR { .. } => { active += 1; }
+        SparseOp::SSCATTR { coord_idx, rs, .. } => {
+            let coord = sentron.regs.phext[coord_idx as usize];
+            let val = sentron.regs.general[rs as usize];
+            mem.scatter_i64(&coord, val);
+            active += 1;
+        }
         SparseOp::SDEDUP { rd, rs, .. } => {
             sentron.regs.general[rd as usize] = sentron.regs.general[rs as usize];
             active += 1;
@@ -209,8 +214,8 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW) -> u8 {
     active
 }
 
-/// Run a sentron to completion, returning execution statistics.
-pub fn run(sentron: &mut Sentron) -> ExecStats {
+/// Run a sentron to completion with PPT-backed memory, returning execution statistics.
+pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
     let mut stats = ExecStats::default();
 
     if sentron.state != SentronState::Running {
@@ -224,7 +229,7 @@ pub fn run(sentron: &mut Sentron) -> ExecStats {
         if matches!(siw.s_op, SparseOp::SNOP) { stats.s_nops += 1; } else { stats.s_ops += 1; }
         if matches!(siw.c_op, CoordOp::CNOP) { stats.c_nops += 1; } else { stats.c_ops += 1; }
 
-        let active = exec_siw(sentron, &siw);
+        let active = exec_siw(sentron, &siw, mem);
         stats.ops_retired += active as u64;
         stats.siws_retired += 1;
         stats.cycles += 1;
@@ -236,6 +241,12 @@ pub fn run(sentron: &mut Sentron) -> ExecStats {
 
     sentron.retire();
     stats
+}
+
+/// Convenience: run with a fresh memory (for D-pipe-only or simple tests)
+pub fn run_standalone(sentron: &mut Sentron) -> ExecStats {
+    let mut mem = Memory::new();
+    run(sentron, &mut mem)
 }
 
 #[cfg(test)]
@@ -252,7 +263,7 @@ mod tests {
     fn execute_empty_program() {
         let mut s = make_sentron();
         s.spawn(vec![]);
-        let stats = run(&mut s);
+        let stats = run_standalone(&mut s);
         assert_eq!(stats.siws_retired, 0);
         assert_eq!(s.state, SentronState::Retired);
     }
@@ -266,12 +277,12 @@ mod tests {
             SIW::new(DenseOp::DMUL { rd: 2, rs1: 0, rs2: 1 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
         ];
         s.spawn(program);
-        let stats = run(&mut s);
+        let stats = run_standalone(&mut s);
 
         assert_eq!(s.regs.general[2], 42);
         assert_eq!(stats.siws_retired, 3);
         assert_eq!(stats.d_ops, 3);
-        assert_eq!(stats.ops_per_cycle(), 1.0); // only D-pipe active
+        assert_eq!(stats.ops_per_cycle(), 1.0);
     }
 
     #[test]
@@ -290,9 +301,9 @@ mod tests {
             ),
         ];
         s.spawn(program);
-        let stats = run(&mut s);
+        let stats = run_standalone(&mut s);
 
-        assert_eq!(s.regs.general[4], 17); // 3*4+5
+        assert_eq!(s.regs.general[4], 17);
         assert_eq!(stats.ops_per_cycle(), 3.0);
         assert_eq!(stats.utilization(), 1.0);
     }
@@ -302,13 +313,13 @@ mod tests {
         let mut s = make_sentron();
         s.regs.general[0] = 100;
         s.regs.general[1] = 200;
-        s.regs.general[2] = 1; // true
+        s.regs.general[2] = 1;
 
         let program = vec![
             SIW::new(DenseOp::DSEL { rd: 3, rs1: 0, rs2: 1, flags: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
         ];
         s.spawn(program);
-        run(&mut s);
+        run_standalone(&mut s);
         assert_eq!(s.regs.general[3], 100);
     }
 
@@ -329,7 +340,7 @@ mod tests {
         }).collect();
 
         s.spawn(program);
-        let stats = run(&mut s);
+        let stats = run_standalone(&mut s);
 
         assert_eq!(stats.siws_retired, 4);
         assert_eq!(stats.ops_retired, 12);
@@ -346,12 +357,91 @@ mod tests {
             SIW::new(DenseOp::DNOP, SparseOp::SNOP, CoordOp::CPACK { rd: 0, rs1: 0, rs2: 1, fmt: MessageFormat::Result }, PhextCoord::zero()),
         ];
         s.spawn(program);
-        run(&mut s);
+        run_standalone(&mut s);
 
         let msg = &s.regs.message[0];
         let a = i64::from_le_bytes(msg[..8].try_into().unwrap());
         let b = i64::from_le_bytes(msg[8..16].try_into().unwrap());
         assert_eq!(a, 0xDEADBEEF);
         assert_eq!(b, 0xCAFEBABE);
+    }
+
+    /// W5: Full gather/scatter through PPT-backed memory
+    #[test]
+    fn gather_scatter_through_ppt() {
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+
+        // Set phext register p0 to coord [5,5,5,1,1,1,1,1,1,1,1]
+        s.regs.phext[0] = PhextCoord::new([5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1]);
+        // Set phext register p1 to different coord
+        s.regs.phext[1] = PhextCoord::new([10, 10, 10, 1, 1, 1, 1, 1, 1, 1, 1]);
+
+        let program = vec![
+            // r0 = 42, then scatter to p0
+            SIW::new(DenseOp::DMOV { rd: 0, imm: 42 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SSCATTR { coord_idx: 0, rs: 0, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            // r1 = 99, then scatter to p1
+            SIW::new(DenseOp::DMOV { rd: 1, imm: 99 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SSCATTR { coord_idx: 1, rs: 1, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            // Gather back: r2 = mem[p0], r3 = mem[p1]
+            SIW::new(DenseOp::DNOP, SparseOp::SGATHER { rd: 2, coord_idx: 0, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SGATHER { rd: 3, coord_idx: 1, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            // r4 = r2 + r3 (should be 42 + 99 = 141)
+            SIW::new(DenseOp::DADD { rd: 4, rs1: 2, rs2: 3 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+        ];
+
+        s.spawn(program);
+        let stats = run(&mut s, &mut mem);
+
+        assert_eq!(s.regs.general[2], 42);
+        assert_eq!(s.regs.general[3], 99);
+        assert_eq!(s.regs.general[4], 141); // 42 + 99
+        assert_eq!(stats.siws_retired, 7);
+
+        // Verify PPT was used
+        let ppt_stats = mem.ppt.stats();
+        assert!(ppt_stats.ptc_hits > 0, "Should have PTC hits from repeated coord access");
+    }
+
+    /// W5: Compute-scatter-gather pipeline (the real vTPU pattern)
+    #[test]
+    fn compute_scatter_gather_pipeline() {
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+
+        // Phext registers: 4 coordinates for a mini dot product
+        for i in 0..4u16 {
+            s.regs.phext[i as usize] = PhextCoord::new([i + 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+        }
+
+        // Pre-seed memory with values at those coordinates
+        let coords: Vec<PhextCoord> = (0..4u16)
+            .map(|i| PhextCoord::new([i + 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]))
+            .collect();
+        mem.scatter_i64(&coords[0], 2);
+        mem.scatter_i64(&coords[1], 3);
+        mem.scatter_i64(&coords[2], 4);
+        mem.scatter_i64(&coords[3], 5);
+
+        let program = vec![
+            // Gather all 4 values (fully packed: D-pipe NOPs to avoid conflicts)
+            SIW::new(DenseOp::DNOP, SparseOp::SGATHER { rd: 0, coord_idx: 0, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SGATHER { rd: 1, coord_idx: 1, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SGATHER { rd: 2, coord_idx: 2, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SGATHER { rd: 3, coord_idx: 3, width: 8 }, CoordOp::CNOP, PhextCoord::zero()),
+            // r4 = r0*r1 = 2*3 = 6
+            SIW::new(DenseOp::DMUL { rd: 4, rs1: 0, rs2: 1 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            // r5 = r2*r3 = 4*5 = 20
+            SIW::new(DenseOp::DMUL { rd: 5, rs1: 2, rs2: 3 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            // r6 = r4 + r5 = 6 + 20 = 26 (dot product: [2,4]·[3,5])
+            SIW::new(DenseOp::DADD { rd: 6, rs1: 4, rs2: 5 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+        ];
+
+        s.spawn(program);
+        let stats = run(&mut s, &mut mem);
+
+        assert_eq!(s.regs.general[6], 26); // dot([2,4], [3,5]) = 6+20 = 26
+        assert_eq!(stats.siws_retired, 7);
     }
 }
