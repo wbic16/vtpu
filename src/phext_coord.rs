@@ -153,6 +153,25 @@ impl PhextCoord {
             .sum()
     }
     
+    /// Fast hash for PhextCoord → u64
+    ///
+    /// Uses FNV-1a style mixing for good distribution with minimal cycles.
+    /// Target: <10 cycles on Zen 4, <1% collision rate on 10K coords.
+    #[inline]
+    pub fn fast_hash(&self) -> u64 {
+        const FNV_OFFSET: u64 = 0xcbf29ce484222325;
+        const FNV_PRIME: u64 = 0x100000001b3;
+        
+        // Mix lo and hi with FNV-1a
+        let mut hash = FNV_OFFSET;
+        hash ^= self.lo;
+        hash = hash.wrapping_mul(FNV_PRIME);
+        hash ^= self.hi;
+        hash = hash.wrapping_mul(FNV_PRIME);
+        
+        hash
+    }
+    
     /// Check if two coordinates differ only in one dimension
     pub fn adjacent(&self, other: &Self, dim: u8) -> bool {
         let dims_a = self.dims();
@@ -239,5 +258,45 @@ mod tests {
         use std::mem;
         assert_eq!(mem::align_of::<PhextCoord>(), 16);  // 128-bit aligned
         assert_eq!(mem::size_of::<PhextCoord>(), 16);   // 128 bits = 16 bytes
+    }
+    
+    #[test]
+    fn test_fast_hash_deterministic() {
+        let coord1 = PhextCoord::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        let coord2 = PhextCoord::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        assert_eq!(coord1.fast_hash(), coord2.fast_hash());
+    }
+    
+    #[test]
+    fn test_fast_hash_unique() {
+        let coord1 = PhextCoord::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+        let coord2 = PhextCoord::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12]);
+        assert_ne!(coord1.fast_hash(), coord2.fast_hash());
+    }
+    
+    #[test]
+    fn test_fast_hash_distribution() {
+        use std::collections::HashSet;
+        
+        // Generate 10K different coordinates and check collision rate
+        let mut hashes = HashSet::new();
+        let mut collisions = 0;
+        
+        for i in 0..10000 {
+            let coord = PhextCoord::new([
+                (i % 100) as u16,
+                (i / 100) as u16,
+                ((i / 10000) % 10) as u16,
+                1, 1, 1, 1, 1, 1, 1, 1,
+            ]);
+            let hash = coord.fast_hash();
+            
+            if !hashes.insert(hash) {
+                collisions += 1;
+            }
+        }
+        
+        let collision_rate = collisions as f64 / 10000.0;
+        assert!(collision_rate < 0.01, "Collision rate too high: {:.2}%", collision_rate * 100.0);
     }
 }
