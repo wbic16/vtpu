@@ -71,6 +71,8 @@ pub mod c_pipe;
 pub mod synchronicity;
 pub mod iching;
 pub mod harmonic;
+pub mod harmonics;
+pub mod cognitive;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
