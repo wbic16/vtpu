@@ -1,3 +1,0 @@
-#!/bin/bash
-# Quick status check - single command validation
-./scripts/r23-status.sh "$@"

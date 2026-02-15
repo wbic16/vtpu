@@ -1,0 +1,83 @@
+#!/bin/bash
+# vTPU status check — the ONE script to run after every pull or wave.
+# Usage: ./check [--verbose]
+set -e
+
+VERBOSE=0
+[[ "${1:-}" == "--verbose" || "${1:-}" == "-v" ]] && VERBOSE=1
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+NC='\033[0m'
+FAIL=0
+
+echo "╔════════════════════════════════════════╗"
+echo "║         vTPU Status Check              ║"
+echo "╚════════════════════════════════════════╝"
+echo ""
+
+# ── Git ──
+echo "Git:"
+echo "  Branch: $(git rev-parse --abbrev-ref HEAD)"
+echo "  Commit: $(git log -1 --oneline)"
+UNPUSHED=$(git log origin/exo..HEAD --oneline 2>/dev/null | wc -l)
+DIRTY=$(git status --short | wc -l)
+[ "$UNPUSHED" -gt 0 ] && echo -e "  ${RED}Unpushed: $UNPUSHED commits${NC}" && FAIL=1
+[ "$DIRTY" -gt 0 ] && echo "  Uncommitted: $DIRTY files"
+echo ""
+
+# ── Build ──
+echo -n "Build: "
+if cargo build --release --quiet 2>&1 | grep -qi "error"; then
+    echo -e "${RED}FAILED${NC}"; FAIL=1
+else
+    WARNS=$(cargo build --release 2>&1 | grep -c "warning\[" || true)
+    echo -e "${GREEN}OK${NC} ($WARNS warnings)"
+fi
+echo ""
+
+# ── Tests ──
+echo -n "Tests: "
+TEST_OUT=$(cargo test --quiet 2>&1)
+PASSED=$(echo "$TEST_OUT" | grep "^test result:" | grep -oP '\d+(?= passed)' | awk '{s+=$1}END{print s+0}')
+FAILED_T=$(echo "$TEST_OUT" | grep "^test result:" | grep -oP '\d+(?= failed)' | awk '{s+=$1}END{print s+0}')
+if [ "$FAILED_T" -gt 0 ]; then
+    echo -e "${RED}$PASSED passed, $FAILED_T FAILED${NC}"; FAIL=1
+else
+    echo -e "${GREEN}$PASSED passed${NC}"
+fi
+echo ""
+
+# ── Dependencies ──
+echo -n "Deps: "
+# Count lines under [dependencies] that look like crate entries
+EXT_DEPS=$(sed -n '/^\[dependencies\]/,/^\[/p' Cargo.toml | grep -cE '^[a-z]' || true)
+EXT_DEPS=${EXT_DEPS:-0}
+if [ "$EXT_DEPS" -gt 0 ]; then
+    echo -e "${RED}$EXT_DEPS external (target: 0)${NC}"; FAIL=1
+else
+    echo -e "${GREEN}0 external ✓${NC}"
+fi
+echo ""
+
+# ── Size ──
+echo "Size:"
+echo "  Rust LOC: $(find src -name '*.rs' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')"
+echo "  Modules:  $(find src -name '*.rs' | wc -l)"
+echo "  Examples: $(find examples -name '*.rs' 2>/dev/null | wc -l)"
+echo ""
+
+# ── Verbose: per-module test breakdown ──
+if [ "$VERBOSE" -eq 1 ]; then
+    echo "Per-module tests:"
+    echo "$TEST_OUT" | grep "^test " | sed 's/^test /  /' | head -40
+    echo ""
+fi
+
+# ── Result ──
+if [ "$FAIL" -eq 0 ]; then
+    echo -e "${GREEN}✓ All clear${NC}"
+else
+    echo -e "${RED}✗ Issues found${NC}"
+    exit 1
+fi
