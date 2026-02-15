@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -O2 -Wall -march=native -std=c11
 LDFLAGS = -lm
 
-TARGETS = sequential_access random_access coordinate_patterns
+TARGETS = sequential_access random_access coordinate_patterns locality_comparison
 
 .PHONY: all clean run profile
 
@@ -15,6 +15,9 @@ random_access: random_access.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 coordinate_patterns: coordinate_patterns.c
+	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
+
+locality_comparison: locality_comparison.c
 	$(CC) $(CFLAGS) -o $@ $< $(LDFLAGS)
 
 run: all

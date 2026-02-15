@@ -60,6 +60,7 @@ pub mod sentron;
 pub mod exec;
 pub mod hdc;
 pub mod analysis;
+pub mod curves;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
@@ -72,4 +73,5 @@ pub use validation::{validate_stream, ValidationError};
 pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
 pub use sentron::{Sentron, SentronState, RegisterFile};
 pub use exec::{run as exec_run, ExecStats};
-pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer};
+pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer, LocalityAnalyzer};
+pub use curves::{ZOrderCurve, HilbertCurve};
