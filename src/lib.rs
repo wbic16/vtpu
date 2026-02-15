@@ -69,6 +69,7 @@ pub mod analysis;
 pub mod curves;
 pub mod c_pipe;
 pub mod synchronicity;
+pub mod iching;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
@@ -80,6 +81,7 @@ pub use stream::StreamBuilder;
 pub use validation::{validate_stream, ValidationError};
 pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
 pub use memory::Memory;
+pub use iching::{Trigram, Element, Hexagram, SentronNode, SemanticCircle};
 pub use sentron::{Sentron, SentronState, RegisterFile};
 pub use exec::{run as exec_run, run_standalone as exec_run_standalone, ExecStats};
 pub use smt::{SmtPair, TrainStats};
