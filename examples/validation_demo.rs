@@ -2,12 +2,13 @@
 //!
 //! Shows how to validate SIW streams and catch common errors
 
-use vtpu_runtime::{SIW, DenseOp, SparseOp, CoordOp, PhextCoord, validate_stream, ValidationError};
+use vtpu_runtime::{SIW, DenseOp, SparseOp, CoordOp, PhextCoord, PrefetchHint};
+use vtpu_runtime::{validate_stream, ValidationError};
 use vtpu_runtime::display::disassemble_stream;
 
 fn main() {
     println!("=== vTPU Stream Validation Demo ===\n");
-    
+
     // Example 1: Valid stream
     println!("--- Example 1: Valid Stream ---");
     let valid_stream = vec![
@@ -18,12 +19,12 @@ fn main() {
             PhextCoord::new([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]),
         ),
     ];
-    
+
     match validate_stream(&valid_stream) {
         Ok(()) => println!("✅ Stream is valid\n"),
         Err(errors) => println!("❌ Errors: {:?}\n", errors),
     }
-    
+
     // Example 2: Register conflict (both D-Pipe and S-Pipe write to r1)
     println!("--- Example 2: Register Conflict ---");
     let conflict_stream = vec![
@@ -34,7 +35,7 @@ fn main() {
             PhextCoord::zero(),
         ),
     ];
-    
+
     match validate_stream(&conflict_stream) {
         Ok(()) => println!("✅ Stream is valid (unexpected!)\n"),
         Err(errors) => {
@@ -49,11 +50,11 @@ fn main() {
             println!();
         }
     }
-    
+
     // Example 3: Empty stream
     println!("--- Example 3: Empty Stream ---");
     let empty_stream: Vec<SIW> = vec![];
-    
+
     match validate_stream(&empty_stream) {
         Ok(()) => println!("✅ Stream is valid (unexpected!)\n"),
         Err(errors) => {
@@ -68,16 +69,13 @@ fn main() {
             println!();
         }
     }
-    
-    // Note: Invalid coordinate detection is tested in unit tests using unsafe new_unchecked()
-    // This example doesn't demonstrate it because PhextCoord::new() validates dimensions
-    
+
     // Example 4: Disassembly output
     println!("--- Example 4: Disassembly ---");
     let demo_stream = vec![
         SIW::new(
             DenseOp::DMOV { rd: 1, imm: 42 },
-            SparseOp::SPREFCH { coord_idx: 0, hint: vtpu_runtime::PrefetchHint::L2 },
+            SparseOp::SPREFCH { coord_idx: 0, hint: PrefetchHint::L2 },
             CoordOp::CNOP,
             PhextCoord::new([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
         ),
@@ -88,6 +86,6 @@ fn main() {
             PhextCoord::new([2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31]),
         ),
     ];
-    
+
     println!("{}", disassemble_stream(&demo_stream));
 }
