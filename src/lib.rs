@@ -62,6 +62,7 @@ pub mod exec;
 pub mod hdc;
 pub mod analysis;
 pub mod curves;
+pub mod c_pipe;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
@@ -77,4 +78,5 @@ pub use sentron::{Sentron, SentronState, RegisterFile};
 pub use exec::{run as exec_run, run_standalone as exec_run_standalone, ExecStats};
 pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer, LocalityAnalyzer};
 pub use curves::{ZOrderCurve, HilbertCurve};
+pub use c_pipe::{CPipeExecutor, Message, SentronId, CPipeError};
 pub mod perf;

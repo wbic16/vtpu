@@ -153,6 +153,16 @@ impl PhextCoord {
             .sum()
     }
     
+    /// Hamming distance to another coordinate (count of differing dimensions)
+    pub fn hamming_distance(&self, other: &Self) -> u32 {
+        let dims_a = self.dims();
+        let dims_b = other.dims();
+        
+        dims_a.iter().zip(dims_b.iter())
+            .filter(|(a, b)| a != b)
+            .count() as u32
+    }
+    
     /// Fast hash for PhextCoord → u64
     ///
     /// Uses FNV-1a style mixing for good distribution with minimal cycles.
