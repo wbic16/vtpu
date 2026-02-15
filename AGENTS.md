@@ -117,3 +117,17 @@ This repo is part of **R23** (Rally 23). Waves are tracked in commit messages: `
 - **Read this file after every `git pull`** to see what changed while you were away
 - **Keep it current** — stale info causes conflicts
 - **When in doubt, ask** — better to over-communicate than stomp on work
+
+---
+
+## GitSync Protocol (MANDATORY)
+
+**All agents must follow:** `/home/wbic16/.openclaw/workspace/GITSYNC-PROTOCOL.md`
+
+### Quick Reference
+1. `git pull --rebase` — before starting work
+2. `./check.sh` — before committing
+3. `git pull --rebase` — before pushing
+4. `git push` — immediately (<60s)
+
+**Violations waste everyone's time.** Follow the protocol.
