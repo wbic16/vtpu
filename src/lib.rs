@@ -10,8 +10,11 @@ pub mod coord;
 pub mod siw;
 pub mod pipe;
 pub mod sentron;
+pub mod exec;
+pub mod builder;
 
 pub use coord::PhextCoord;
 pub use pipe::{DenseOp, SparseOp, CoordOp};
 pub use siw::SIW;
 pub use sentron::Sentron;
+pub use exec::{run, ExecStats};

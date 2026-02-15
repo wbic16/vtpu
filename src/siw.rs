@@ -234,7 +234,7 @@ mod tests {
     /// All three SIWs should have Deps::NONE (fully independent)
     #[test]
     fn double_buffer_pattern() {
-        let coord_k = PhextCoord::from_phext(1,1,1, 1,1,1, 1,1,1);
+        let _coord_k = PhextCoord::from_phext(1,1,1, 1,1,1, 1,1,1);
         let coord_k2 = PhextCoord::from_phext(1,1,1, 1,1,1, 1,1,3);
 
         let siw_n = SIW::new(
