@@ -4,7 +4,6 @@
 
 use crate::siw::SIW;
 use crate::pipes::{DenseOp, SparseOp, CoordOp};
-use crate::phext_coord::PhextCoord;
 
 /// Builder for SIW streams with automatic dependency analysis
 pub struct StreamBuilder {
@@ -175,6 +174,7 @@ fn get_coord_write_register(op: &CoordOp) -> Option<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::PhextCoord;
     
     #[test]
     fn test_builder_empty() {
