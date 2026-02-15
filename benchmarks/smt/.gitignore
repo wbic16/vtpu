@@ -1,0 +1,4 @@
+single_thread
+dual_thread
+complementary_workloads
+*.o
