@@ -1,77 +1,35 @@
-# vTPU Runtime
+# vTPU - Virtual Tensor Processing Unit
 
-Software-defined Virtual TPU with phext-native addressing.
+**Status**: Phase 0 - Foundation (Wave 2/40 in progress)  
+**Timeline**: 154 days (Feb 14 - Jul 18, 2026)  
+**Target**: 359 Gops/sec sustained on AMD R9 8945HS + Shell of Nine cluster
 
-## Overview
+## What is vTPU?
 
-vTPU achieves 3 operations/cycle sustained throughput on commodity AMD Ryzen 9 processors through sentron-native instruction scheduling. Core innovation: the 3-pipe retirement model (D/S/C) eliminates out-of-order scheduling bottlenecks.
+vTPU is a software-defined Tensor Processing Unit designed to run on commodity AMD hardware. It closes the 37.8% gap between TPU utilization (57.8% peak) and CPU utilization (20% peak) through:
 
-**Target Performance:**
-- Ops/cycle: 3.0 (vs. 1.2 typical for general code)
-- Single node: 75 Gops/sec @ 125W (600 Mops/W)
-- Cluster (5 nodes): 359 Gops/sec @ 625W (574 Mops/W)
+- **Sentron ISA**: Purpose-built instruction set for cognitive workloads
+- **Phext-native addressing**: 11D coordinate space maps directly to memory hierarchy
+- **3-pipe execution**: D-Pipe (dense), S-Pipe (sparse), C-Pipe (coordination)
+- **Geometric optimization**: O(N^k) operations become O(1) or O(log N) in phext
 
-## Architecture
+### Performance Targets
 
-### Sentron Instruction Word (SIW)
+| Metric | Target | Baseline | Improvement |
+|--------|--------|----------|-------------|
+| Ops/cycle | 3.0 | 1.2 | 2.5× |
+| L1 hit rate | 95% | ~85% | +10pp |
+| Memory bandwidth | 85 GB/s | ~60 GB/s | 1.4× |
+| Qwen3 throughput | 75 tok/s | 45-50 tok/s | 1.5-1.7× |
+| Geometric ops | 10× speedup | 1× | 10× |
+| Cost/trillion-ops | $0.004 | — | 1/50th TPU v4 |
 
-Each SIW contains exactly 3 operations:
-- **D-Pipe**: Dense/ALU operation (arithmetic, comparison, reduction)
-- **S-Pipe**: Sparse/Memory operation (phext coordinate addressing)
-- **C-Pipe**: Coordination operation (inter-sentron communication)
+### Cluster Configuration (Shell of Nine)
 
-The 3 operations map to independent Zen 4 execution units → zero resource conflicts → 3 retirements/cycle.
-
-### Phext-Native Addressing
-
-Memory operations use 11-dimensional phext coordinates (128-bit packed):
-- Each dimension: 11 bits (2048 positions)
-- Total address space: 2048^11 ≈ 10^36 positions
-- Dimensional locality → cache-friendly by construction
-
-## Status (R23 Wave 2)
-
-**Implemented:**
-- ✅ SIW struct (cache-line aligned, 64 bytes)
-- ✅ D-Pipe opcodes (8 ops: DFMA, DADD, DSUB, DMUL, DCMP, DRED, DSEL, DMOV)
-- ✅ S-Pipe opcodes (8 ops: SGATHER, SSCATTR, SINDEX, SDEDUP, SPREFCH, SFLUSH, SALLOC, SFREE)
-- ✅ C-Pipe opcodes (8 ops: CPACK, CROUTE, CSEND, CRECV, CBAR, CFENCE, CREDUCE, CCAST)
-- ✅ PhextCoord (11D coordinate, Manhattan distance, adjacency checks)
-- ✅ VtpuTelemetry (ops/cycle, cache hit rate, energy efficiency tracking)
-- ✅ StreamBuilder (fluent API with automatic dependency tracking)
-- ✅ Display/Debug formatting (human-readable SIW output)
-- ✅ Validation (detect register conflicts, invalid coordinates, broken dependencies)
-- ✅ Examples (basic_compute, validation_demo)
-
-**Pending (Wave 3+):**
-- ⏳ Micro-scheduler (pin SIWs to Zen 4 execution ports)
-- ⏳ Phext Page Table (PPT) for coordinate → physical address translation
-- ⏳ Actual pipe execution (D/S/C dispatch)
-- ⏳ Performance validation (perf counters integration)
-
-## Building
-
-```bash
-cargo build --release
-cargo test
-```
-
-## Testing
-
-```bash
-# Run unit tests (26 tests as of W2)
-cargo test
-
-# Run with output
-cargo test -- --nocapture
-
-# Run examples
-cargo run --example basic_compute
-cargo run --example validation_demo
-
-# Run benchmarks (Wave 4+)
-cargo bench
-```
+- **5 nodes** × 8 cores = 40 vTPU cores
+- **480 GB RAM** total (96 GB per node)
+- **359 Gops/sec** sustained cluster throughput
+- **$7,500** hardware cost vs $400K TPU v4
 
 ---
 
@@ -93,158 +51,153 @@ Wave 1 & 2 documentation (86.7 KB):
 
 ## Quick Start
 
-### 1. Basic SIW Creation
+### Wave 1: Read the Specs (Complete ✅)
 
-```rust
-use vtpu_runtime::{SIW, DenseOp, SparseOp, CoordOp, PhextCoord};
+Start here:
+1. [Wave 1 Onboarding Guide](waves/WAVE1-ONBOARDING.md) - How to navigate the project
+2. [Dashboard](docs/DASHBOARD.md) - 40-wave roadmap and progress
+3. [vTPU Spec v0.1](docs/vtpu-spec-v0.1.md) - Core architecture (51 KB)
+4. [KPI Framework](docs/vtpu-kpis-and-roadmap.md) - Success metrics and phases
 
-// Create a simple SIW: D-Pipe adds, S-Pipe fetches, C-Pipe no-op
-let siw = SIW::new(
-    DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 },
-    SparseOp::SGATHER { rd: 4, coord_idx: 0, width: 64 },
-    CoordOp::CNOP,
-    PhextCoord::new([3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5]),
-);
-
-println!("{}", siw);
-// Output: SIW[00000000] { D: add r1 ← r2 + r3, S: gather r4 ← phext[c0] (64B), C: nop, @ 3.1.4/1.5.9/2.6.5.3.5 }
-```
-
-### 2. Building SIW Streams (Automatic Dependency Tracking)
-
-```rust
-use vtpu_runtime::StreamBuilder;
-
-let mut builder = StreamBuilder::new();
-
-// Load x
-builder.push(SIW::new(
-    DenseOp::DNOP,
-    SparseOp::SGATHER { rd: 1, coord_idx: 0, width: 64 },
-    CoordOp::CNOP,
-    PhextCoord::new([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]),
-));
-
-// Load y
-builder.push(SIW::new(
-    DenseOp::DNOP,
-    SparseOp::SGATHER { rd: 2, coord_idx: 1, width: 64 },
-    CoordOp::CNOP,
-    PhextCoord::new([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2]),
-));
-
-// Compute z = x + y (StreamBuilder automatically detects dependency on prior S-Pipe writes)
-builder.push(SIW::new(
-    DenseOp::DADD { rd: 3, rs1: 1, rs2: 2 },
-    SparseOp::SNOP,
-    CoordOp::CNOP,
-    PhextCoord::zero(),
-));
-
-let stream = builder.build();
-```
-
-### 3. Validation
-
-```rust
-use vtpu_runtime::{validate_stream, ValidationError};
-
-match validate_stream(&stream) {
-    Ok(()) => println!("✅ Stream is valid"),
-    Err(errors) => {
-        for err in errors {
-            match err {
-                ValidationError::RegisterConflict { siw_idx, register } => {
-                    eprintln!("❌ SIW {}: Multiple pipes write to r{}", siw_idx, register);
-                }
-                ValidationError::InvalidCoordinate { siw_idx, dim, value } => {
-                    eprintln!("❌ SIW {}: Dimension {} out of range ({})", siw_idx, dim, value);
-                }
-                _ => eprintln!("❌ {:?}", err),
-            }
-        }
-    }
-}
-```
-
-### 4. Execution (Placeholder - Full Implementation in Wave 3)
-
-```rust
-use vtpu_runtime::Scheduler;
-
-let mut scheduler = Scheduler::new();
-scheduler.execute_stream(&stream);
-
-let telemetry = scheduler.telemetry();
-println!("Ops/cycle: {:.2}", telemetry.ops_per_cycle());
-println!("Target: 3.0");
-```
-
-### 5. Disassembly Output
-
-```rust
-use vtpu_runtime::display::disassemble_stream;
-
-println!("{}", disassemble_stream(&stream));
-// Output:
-// 0000:  [00000000]  nop                             | gather r1 ← phext[c0] (64B)     | nop
-//         @ 1.1.1/1.1.1/1.1.1.1.1
-// 0040:  [00000000]  nop                             | gather r2 ← phext[c1] (64B)     | nop
-//         @ 1.1.1/1.1.1/1.1.1.1.2
-// 0080:  [00010000]  add r3 ← r1 + r2                | nop                              | nop
-//         @ 0.0.0/0.0.0/0.0.0.0.0
-```
-
-## Examples
-
-Run the included examples to see vTPU in action:
+### Wave 2: Run Baselines (In Progress 🟡)
 
 ```bash
-# Basic compute kernel (load → add → store)
-cargo run --example basic_compute
+# Compile cache benchmarks
+cd benchmarks/cache
+make
 
-# Validation and debugging demo
-cargo run --example validation_demo
+# Run baseline measurements
+./sequential_access
+./random_access
+./coordinate_patterns
+
+# Profile with perf (requires Linux + perf)
+perf stat -e cache-references,cache-misses,cycles,instructions ./sequential_access
 ```
 
-## API Documentation
+See [benchmarks/cache/README.md](benchmarks/cache/README.md) for details.
 
-Generate full API docs:
+## Project Structure
+
+```
+vtpu/
+├── docs/              # Specifications and planning
+│   ├── vtpu-spec-v0.1.md                # Core architecture
+│   ├── vtpu-kpis-and-roadmap.md         # 12 KPIs + 7 phases
+│   ├── vtpu-geometric-extensions.md     # Phext geometric advantages
+│   └── DASHBOARD.md                     # 40-wave tracking
+├── benchmarks/        # Performance measurements
+│   └── cache/         # L1/L2/L3 cache locality tests
+├── waves/             # Wave completion guides
+│   └── WAVE1-ONBOARDING.md
+├── src/               # vTPU implementation (Rust)
+└── README.md          # This file
+```
+
+## Roadmap
+
+### Phase 0: Foundation (Waves 1-10, ~2 weeks)
+- ✅ Wave 1: Specification
+- 🟡 Wave 2: Baseline measurements
+- Waves 3-10: Micro-benchmarks, profiling, Phase 1 design
+
+### Phase 1: Proof of Concept (Waves 11-15, ~2 weeks)
+- Single-core D-Pipe + S-Pipe prototype
+- Sentron ISA interpreter
+- Target: 2.0 ops/cycle on synthetic workloads
+
+### Phase 2-6: Full Implementation (Waves 16-40, ~18 weeks)
+- C-Pipe coordination
+- Qwen3 integration
+- Geometric operation libraries
+- Multi-node clustering
+- Production hardening
+
+**Target completion**: July 18, 2026 (154 days)
+
+## Key Innovations
+
+### 1. Phext-Native Memory Hierarchy
+
+Memory tiers map directly to phext dimensions:
+- **0-2D** → L1 cache (32 KB)
+- **0-4D** → L2 cache (512 KB)
+- **0-7D** → L3 cache (16 MB)
+- **0-9D** → DDR5 RAM (96 GB)
+- **All 11D** → Cluster mesh (480 GB)
+
+Coordinate locality = memory locality. No translation overhead.
+
+### 2. 3-Pipe Retirement Model
+
+| Pipe | Purpose | Example Operations |
+|------|---------|-------------------|
+| D-Pipe | Dense compute | ADD, MUL, FMA, RELU |
+| S-Pipe | Sparse/Memory | LOAD, STORE, GATHER, SCATTER |
+| C-Pipe | Coordination | SEND, RECV, SYNC, BARRIER |
+
+Each pipe can retire one instruction per cycle → 3 ops/cycle sustained.
+
+### 3. Sentron ISA
+
+27 base instructions designed for cognitive workloads:
+- **Dense ops**: ADD, MUL, FMA, DOT, RELU, SOFTMAX
+- **Sparse ops**: LOAD_COORD, STORE_COORD, GATHER, SCATTER
+- **Geometric ops**: HYPERGRAPH_WALK, TENSOR_CONTRACT, SIMPLICIAL_CHAIN
+- **Coordination**: SEND_MSG, RECV_MSG, SYNC_BARRIER, FORK_SENTRON
+
+See [docs/vtpu-spec-v0.1.md](docs/vtpu-spec-v0.1.md) for full ISA reference.
+
+## Development
+
+### Prerequisites
+
+- **Hardware**: AMD R9 8945HS or similar (8C/16T minimum)
+- **OS**: Linux (tested on Ubuntu 22.04+)
+- **Rust**: 1.75+ (`rustup install stable`)
+- **Tools**: `gcc`, `make`, `perf` (Linux perf tools)
+
+### Build
 
 ```bash
-cargo doc --open
+# Build vTPU runtime
+cargo build --release
+
+# Build benchmarks
+cd benchmarks/cache
+make
+
+# Run tests
+cargo test
 ```
 
-## Performance Notes
+### Contributing
 
-- **SIW size:** 64 bytes (cache-line aligned)
-- **Ops per SIW:** 3 (D-Pipe + S-Pipe + C-Pipe)
-- **Target retirement rate:** 1 SIW/cycle = 3 ops/cycle
-- **Current scheduler:** Placeholder (W3 will implement actual Zen 4 port mapping)
+vTPU is developed as part of the Mirrorborn Shell of Nine project. See [CONTRIBUTORS.md](https://github.com/wbic16/exo-plan/blob/exo/CONTRIBUTORS.md) for guidelines.
 
-## Wave 2 Improvements (This Update)
+## Background
 
-- **StreamBuilder:** Fluent API for SIW stream construction with automatic dependency tracking
-- **Validation:** Detect register conflicts, invalid coordinates, broken dependencies
-- **Display traits:** Human-readable output for SIWs, opcodes, and coordinates
-- **Disassembly:** Generate assembly-style output for debugging
-- **Examples:** `basic_compute.rs` and `validation_demo.rs`
-- **Extended tests:** 26 unit tests (up from 18 in initial W2)
+vTPU emerged from R23 (Rally 23) of the Mirrorborn project - a 40-wave, 154-day implementation rally to build distributed ASI infrastructure on commodity hardware.
 
-## Next Steps (Wave 3)
-
-- Implement micro-scheduler (pin D/S/C pipes to Zen 4 execution ports)
-- Integrate `perf_event_open` for real ops/cycle measurement
-- Add actual execution (replace placeholder scheduler)
-- Validate 2.5+ ops/cycle on real hardware
+**Key context:**
+- **Phext**: 11-dimensional plain text substrate (addresses: `X.X.X/Y.Y.Y/Z.Z.Z`)
+- **Sentron**: Cognitive unit (40 neurons per mote)
+- **Shell of Nine**: 5-node AMD R9 cluster (40 vTPU cores, 480 GB RAM)
+- **Exocortex of 2130**: Long-term vision for human-ASI cognitive substrate
 
 ## License
 
-MIT
+MIT (see [LICENSE](LICENSE))
 
-## References
+## Links
 
-- **Spec:** `exo-plan/r23/vTPU-spec-v0.1.md` (33KB architecture specification)
-- **Geometric Advantages:** `exo-plan/r23/vTPU-geometric-advantages.md` (why 11D wins)
-- **Roadmap:** `exo-plan/r23/R23-WAVE-PLAN.md` (40-wave implementation plan)
-- **Dashboard:** `exo-plan/r23/R23-DASHBOARD.md` (live progress tracking)
+- **Phext Spec**: https://phext.io
+- **Shell of Nine**: https://github.com/wbic16/exo-plan
+- **SQ Cloud**: https://mirrorborn.us (phext database)
+- **Mirrorborn**: https://mirrorborn.us/profiles/
+
+---
+
+**Progress**: 2.5% (1/40 waves complete)  
+**Next Wave**: Baseline measurements (perf stat, cache profiling, Qwen3 benchmarks)  
+**Updated**: 2026-02-14 21:05 CST
