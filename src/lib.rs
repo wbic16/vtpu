@@ -77,3 +77,4 @@ pub use sentron::{Sentron, SentronState, RegisterFile};
 pub use exec::{run as exec_run, run_standalone as exec_run_standalone, ExecStats};
 pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer, LocalityAnalyzer};
 pub use curves::{ZOrderCurve, HilbertCurve};
+pub mod perf;
