@@ -56,6 +56,8 @@ pub mod stream;
 pub mod display;
 pub mod validation;
 pub mod ppt;
+pub mod sentron;
+pub mod exec;
 pub mod analysis;
 
 pub use siw::SIW;
@@ -66,4 +68,6 @@ pub use scheduler::Scheduler;
 pub use stream::StreamBuilder;
 pub use validation::{validate_stream, ValidationError};
 pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
+pub use sentron::{Sentron, SentronState, RegisterFile};
+pub use exec::{run as exec_run, ExecStats};
 pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer};
