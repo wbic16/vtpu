@@ -51,6 +51,7 @@ pub mod siw;
 pub mod pipes;
 pub mod phext_coord;
 pub mod telemetry;
+pub mod regalloc;
 pub mod scheduler;
 pub mod stream;
 pub mod display;
