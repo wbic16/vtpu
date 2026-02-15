@@ -73,6 +73,7 @@ pub mod iching;
 pub mod harmonic;
 pub mod harmonics;
 pub mod cognitive;
+pub mod wedge;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
@@ -93,5 +94,6 @@ pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnaly
 pub use curves::{ZOrderCurve, HilbertCurve};
 pub use c_pipe::{CPipeExecutor, Message, SentronId, CPipeError};
 pub use synchronicity::{WuXing, Bagua, SentronMote, ShellOfNine, TOTAL_MOTES, NODES, MOTES_PER_NODE};
+pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES};
 pub mod perf;
 pub mod integration;
