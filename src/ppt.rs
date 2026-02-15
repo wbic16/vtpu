@@ -59,10 +59,11 @@ impl Default for PTCEntry {
 
 /// Phext Translation Cache — like a TLB but for 11D coordinates
 /// 4-way set associative, 256 sets = 1024 entries
+const PTC_WAYS: usize = 8;
+
 struct PTC {
-    sets: Vec<[PTCEntry; 4]>,
+    sets: Vec<[PTCEntry; PTC_WAYS]>,
     num_sets: usize,
-    // Telemetry
     hits: u64,
     misses: u64,
 }
@@ -70,7 +71,7 @@ struct PTC {
 impl PTC {
     fn new(num_sets: usize) -> Self {
         PTC {
-            sets: vec![[PTCEntry::default(); 4]; num_sets],
+            sets: vec![[PTCEntry::default(); PTC_WAYS]; num_sets],
             num_sets,
             hits: 0,
             misses: 0,
@@ -80,12 +81,10 @@ impl PTC {
     /// Hash coordinate to set index
     #[inline(always)]
     fn set_index(&self, coord: &PhextCoord) -> usize {
-        // Mix all dimensions for even distribution
-        let dims = coord.dims();
-        let mut hash = 0u64;
-        for (i, &d) in dims.iter().enumerate() {
-            hash ^= (d as u64).wrapping_mul(0x517cc1b727220a95_u64.wrapping_add(i as u64 * 7));
-        }
+        // Use raw bits directly — better distribution than per-dim hashing
+        let (lo, hi) = coord.as_raw();
+        let hash = lo.wrapping_mul(0x517cc1b727220a95) ^ hi.wrapping_mul(0x9E3779B97F4A7C15);
+        let hash = hash ^ (hash >> 17) ^ (hash >> 34);
         (hash as usize) % self.num_sets
     }
 
@@ -181,7 +180,7 @@ pub struct PPTStats {
 
 impl PhextPageTable {
     /// Create a new PPT with default configuration
-    /// - 256 PTC sets × 4-way = 1024 entries
+    /// - 256 PTC sets × 8-way = 2048 entries
     /// - 2^21 = 2M entries per inner page (fits L1→L3 hierarchy)
     pub fn new() -> Self {
         Self::with_config(256, 1 << 21)
@@ -270,6 +269,7 @@ impl PhextPageTable {
             4..=5 => MemoryTier::L2Local,
             6..=8 => MemoryTier::L3Shared,
             9..=10 => MemoryTier::NodeLocal,
+            11 => MemoryTier::Remote,
             _ => MemoryTier::Remote,
         }
     }
