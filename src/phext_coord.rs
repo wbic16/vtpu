@@ -194,6 +194,12 @@ impl PhextCoord {
         
         true
     }
+    
+    /// Simple hash function for coordinate (XOR of lo and hi)
+    /// Used for address generation in sparse memory benchmarks
+    pub fn hash(&self) -> u64 {
+        self.lo ^ self.hi
+    }
 }
 
 impl fmt::Debug for PhextCoord {
