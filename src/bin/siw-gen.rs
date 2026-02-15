@@ -5,65 +5,94 @@
 // - Dependency depth (independent vs chained)
 // - Coordinate locality (same-scroll vs cross-volume)
 
-use clap::{Parser, ValueEnum};
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
 use vtpu_runtime::{CoordOp, DenseOp, PhextCoord, SparseOp, SIW, PrefetchHint, ReductionOp, MessageFormat, FenceScope};
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum Pattern {
-    /// 80% D-Pipe, 10% S-Pipe, 10% C-Pipe
-    DHeavy,
-    /// 10% D-Pipe, 80% S-Pipe, 10% C-Pipe
-    SHeavy,
-    /// 10% D-Pipe, 10% S-Pipe, 80% C-Pipe
-    CHeavy,
-    /// 33% D-Pipe, 33% S-Pipe, 33% C-Pipe
-    Balanced,
-}
+#[derive(Debug, Clone, Copy)]
+enum Pattern { DHeavy, SHeavy, CHeavy, Balanced }
 
-#[derive(Debug, Clone, Copy, ValueEnum)]
-enum Locality {
-    /// All accesses in same scroll (3D = constant)
-    High,
-    /// Accesses across scrolls in same section (4D varies)
-    Medium,
-    /// Accesses across chapters/volumes (6D+ varies)
-    Low,
-}
+#[derive(Debug, Clone, Copy)]
+enum Locality { High, Medium, Low }
 
-#[derive(Parser, Debug)]
-#[command(name = "siw-gen")]
-#[command(about = "Generate synthetic vTPU SIW streams for benchmarking")]
+#[derive(Debug)]
 struct Args {
-    /// SIW generation pattern (d-heavy, s-heavy, c-heavy, balanced)
-    #[arg(short, long, value_enum, default_value = "balanced")]
     pattern: Pattern,
-
-    /// Number of SIWs to generate
-    #[arg(short = 'n', long, default_value = "1000")]
     count: usize,
-
-    /// Coordinate locality (high, medium, low)
-    #[arg(short, long, value_enum, default_value = "medium")]
     locality: Locality,
-
-    /// Dependency chain depth (0 = all independent)
-    #[arg(short, long, default_value = "2")]
     dep_depth: u8,
-
-    /// Output file path
-    #[arg(short, long)]
     output: PathBuf,
-
-    /// Generate text output instead of binary
-    #[arg(short = 't', long)]
     text: bool,
 }
 
+fn parse_args() -> Args {
+    let args: Vec<String> = std::env::args().collect();
+    let mut pattern = Pattern::Balanced;
+    let mut count = 1000usize;
+    let mut locality = Locality::Medium;
+    let mut dep_depth = 2u8;
+    let mut output = None;
+    let mut text = false;
+
+    let mut i = 1;
+    while i < args.len() {
+        match args[i].as_str() {
+            "-p" | "--pattern" => {
+                i += 1;
+                pattern = match args.get(i).map(|s| s.as_str()) {
+                    Some("d-heavy") => Pattern::DHeavy,
+                    Some("s-heavy") => Pattern::SHeavy,
+                    Some("c-heavy") => Pattern::CHeavy,
+                    Some("balanced") => Pattern::Balanced,
+                    _ => { eprintln!("Unknown pattern. Use: d-heavy, s-heavy, c-heavy, balanced"); std::process::exit(1); }
+                };
+            }
+            "-n" | "--count" => {
+                i += 1;
+                count = args.get(i).and_then(|s| s.parse().ok()).unwrap_or_else(|| { eprintln!("Invalid count"); std::process::exit(1); });
+            }
+            "-l" | "--locality" => {
+                i += 1;
+                locality = match args.get(i).map(|s| s.as_str()) {
+                    Some("high") => Locality::High,
+                    Some("medium") => Locality::Medium,
+                    Some("low") => Locality::Low,
+                    _ => { eprintln!("Unknown locality. Use: high, medium, low"); std::process::exit(1); }
+                };
+            }
+            "-d" | "--dep-depth" => {
+                i += 1;
+                dep_depth = args.get(i).and_then(|s| s.parse().ok()).unwrap_or_else(|| { eprintln!("Invalid dep-depth"); std::process::exit(1); });
+            }
+            "-o" | "--output" => {
+                i += 1;
+                output = args.get(i).map(PathBuf::from);
+            }
+            "-t" | "--text" => { text = true; }
+            "-h" | "--help" => {
+                println!("siw-gen: Generate synthetic vTPU SIW streams for benchmarking\n");
+                println!("Usage: siw-gen -o <output> [options]\n");
+                println!("Options:");
+                println!("  -p, --pattern <PATTERN>    d-heavy|s-heavy|c-heavy|balanced (default: balanced)");
+                println!("  -n, --count <N>            Number of SIWs (default: 1000)");
+                println!("  -l, --locality <LEVEL>     high|medium|low (default: medium)");
+                println!("  -d, --dep-depth <N>        Dependency chain depth (default: 2)");
+                println!("  -o, --output <PATH>        Output file path (required)");
+                println!("  -t, --text                 Text output instead of binary");
+                std::process::exit(0);
+            }
+            other => { eprintln!("Unknown argument: {other}. Use --help."); std::process::exit(1); }
+        }
+        i += 1;
+    }
+
+    let output = output.unwrap_or_else(|| { eprintln!("Missing required -o/--output"); std::process::exit(1); });
+    Args { pattern, count, locality, dep_depth, output, text }
+}
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let args = Args::parse();
+    let args = parse_args();
 
     let siws = generate_siw_stream(&args);
 

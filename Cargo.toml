@@ -8,8 +8,7 @@ description = "vTPU: Software-defined virtual TPU with phext-native addressing"
 repository = "https://github.com/wbic16/vtpu"
 
 [dependencies]
-# CLI argument parsing (Wave 3: siw-gen binary)
-clap = { version = "4.5", features = ["derive"] }
+# Zero external dependencies. Keep it that way.
 
 # Performance monitoring (TODO Wave 3: integrate perf counters)
 # perf-event = "0.4"
