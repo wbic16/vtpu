@@ -3,6 +3,7 @@ name = "vtpu"
 version = "0.1.0"
 edition = "2021"
 description = "vTPU Phase 0: 3-pipe retirement benchmark on Zen 4"
+license = "MIT"
 
 [dependencies]
 
