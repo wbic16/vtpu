@@ -1,10 +1,33 @@
 [package]
-name = "vtpu"
+name = "vtpu-runtime"
 version = "0.1.0"
 edition = "2021"
-description = "Virtual Tensor Processing Unit — sentron-native compute on AMD R9"
+authors = ["Ranch Choir <will@phext.io>"]
 license = "MIT"
-repository = "https://github.com/wbic16/vtpu"
+description = "vTPU: Software-defined virtual TPU with phext-native addressing"
+repository = "https://github.com/wbic16/vtpu-runtime"
 
 [dependencies]
-# Zero external deps for Phase 0. Hardware just needs good software.
+# Performance monitoring (TODO Wave 3: integrate perf counters)
+# perf-event = "0.4"
+
+# Atomic operations for telemetry
+# parking_lot = "0.12"
+
+# Phext coordinate manipulation (TODO: integrate libphext-rs if needed)
+# phext = { git = "https://github.com/wbic16/libphext-rs", branch = "main" }
+
+[dev-dependencies]
+# criterion = "0.5"  # TODO Wave 4: Benchmark suite
+
+# [[bench]]
+# name = "siw_dispatch"
+# harness = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+
+[profile.bench]
+inherits = "release"
