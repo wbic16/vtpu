@@ -3,3 +3,4 @@
 benchmarks/cache/sequential_access
 benchmarks/cache/random_access
 benchmarks/cache/coordinate_patterns
+Cargo.lock
