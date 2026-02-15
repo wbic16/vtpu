@@ -1,6 +1,6 @@
 # vTPU - Virtual Tensor Processing Unit
 
-**Status**: Phase 0 - Foundation (Wave 2/40 in progress)  
+**Status**: Phase 0 - Foundation (Wave 3/40 complete)  
 **Timeline**: 154 days (Feb 14 - Jul 18, 2026)  
 **Target**: 359 Gops/sec sustained on AMD R9 8945HS + Shell of Nine cluster
 
@@ -81,25 +81,33 @@ See [benchmarks/cache/README.md](benchmarks/cache/README.md) for details.
 
 ```
 vtpu/
-├── docs/              # Specifications and planning
-│   ├── vtpu-spec-v0.1.md                # Core architecture
-│   ├── vtpu-kpis-and-roadmap.md         # 12 KPIs + 7 phases
-│   ├── vtpu-geometric-extensions.md     # Phext geometric advantages
-│   └── DASHBOARD.md                     # 40-wave tracking
-├── benchmarks/        # Performance measurements
-│   └── cache/         # L1/L2/L3 cache locality tests
-├── waves/             # Wave completion guides
-│   └── WAVE1-ONBOARDING.md
-├── src/               # vTPU implementation (Rust)
-└── README.md          # This file
+├── src/
+│   ├── lib.rs         # Public API exports
+│   ├── coord.rs       # PhextCoord — 128-bit packed 11D coordinate
+│   ├── pipe.rs        # svISA — 27 ops (DenseOp, SparseOp, CoordOp)
+│   ├── siw.rs         # SIW — 3-wide instruction word + SIWStream
+│   ├── sentron.rs     # Sentron lifecycle + 392-byte register file
+│   ├── exec.rs        # Phase 0 interpreter + ExecStats
+│   ├── builder.rs     # DoubleBuffer, phext_scan, dot_product
+│   ├── ppt.rs         # Phext Page Table (Z-order, PTC, memory tiers)
+│   ├── display.rs     # Disassembly output
+│   ├── validation.rs  # Stream validation (register conflicts, deps)
+│   ├── stream.rs      # StreamBuilder
+│   ├── scheduler.rs   # Instruction scheduler
+│   └── telemetry.rs   # VtpuTelemetry
+├── examples/
+│   ├── basic_compute.rs    # Simple SIW construction + execution
+│   └── validation_demo.rs  # Stream validation + disassembly
+└── README.md
 ```
 
 ## Roadmap
 
 ### Phase 0: Foundation (Waves 1-10, ~2 weeks)
-- ✅ Wave 1: Specification
-- 🟡 Wave 2: Baseline measurements
-- Waves 3-10: Micro-benchmarks, profiling, Phase 1 design
+- ✅ Wave 1: Specification (svISA, 27 ops, 3-pipe model)
+- ✅ Wave 2: Rust crate (1,590 LOC, 28 tests, zero deps)
+- ✅ Wave 3: PPT — Phext Page Table (Z-order curves, translation cache, memory tier classification, 10 tests)
+- Waves 4-10: D-Pipe dispatch, S-Pipe+PPT integration, vBench benchmarks
 
 ### Phase 1: Proof of Concept (Waves 11-15, ~2 weeks)
 - Single-core D-Pipe + S-Pipe prototype
@@ -198,6 +206,7 @@ MIT (see [LICENSE](LICENSE))
 
 ---
 
-**Progress**: 2.5% (1/40 waves complete)  
-**Next Wave**: Baseline measurements (perf stat, cache profiling, Qwen3 benchmarks)  
-**Updated**: 2026-02-14 21:05 CST
+**Progress**: 7.5% (3/40 waves complete)  
+**Next Wave**: W4 — D-Pipe op dispatch (interpreter → native execution)  
+**Updated**: 2026-02-15  
+**Tests**: 38 passing, 0 failures, zero deps, zero warnings

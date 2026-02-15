@@ -293,7 +293,7 @@ impl PhextPageTable {
         self.touch_dim(dim);
         let mut addrs = Vec::with_capacity(count as usize);
         let mut coord = *base_coord;
-        for i in 0..count {
+        for _i in 0..count {
             let current = coord.get_dim(dim);
             coord.set_dim(dim, (current + 1).min(PhextCoord::MAX_DIM));
             addrs.push(self.translate(&coord));
