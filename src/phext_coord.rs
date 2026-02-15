@@ -125,6 +125,12 @@ impl PhextCoord {
         ]
     }
     
+    /// Get raw (lo, hi) representation for fast comparison
+    #[inline(always)]
+    pub fn as_raw(&self) -> (u64, u64) {
+        (self.lo, self.hi)
+    }
+
     /// Get flags (7 bits in upper portion)
     pub fn flags(&self) -> u8 {
         ((self.hi >> 55) & 0x7F) as u8

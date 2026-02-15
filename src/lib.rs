@@ -55,6 +55,7 @@ pub mod scheduler;
 pub mod stream;
 pub mod display;
 pub mod validation;
+pub mod ppt;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope};
@@ -63,3 +64,4 @@ pub use telemetry::VtpuTelemetry;
 pub use scheduler::Scheduler;
 pub use stream::StreamBuilder;
 pub use validation::{validate_stream, ValidationError};
+pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
