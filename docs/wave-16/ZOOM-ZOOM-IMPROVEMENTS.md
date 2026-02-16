@@ -56,10 +56,13 @@ docs/wave-16/
    - Currently stubs (return Ok)
    - Need: routing logic, reduction kernels, broadcast mechanism, fence semantics
 
-2. **Add examples for each packing pattern** (from PACKING-PATTERNS.md)
+2. ✅ **Add examples for each packing pattern** (from PACKING-PATTERNS.md) — COMPLETE
    - Guide has 4 patterns documented
-   - Only one has runnable code (w16_packing_demo.rs)
-   - Need: batch query example, memory-heavy example, HDC inference example
+   - Now ALL have runnable code:
+     - w16_packing_demo.rs (general demo)
+     - batch_query_pattern.rs (3.0 ops/cycle)
+     - hdc_inference_pattern.rs (2.97 ops/cycle)
+     - memory_heavy_pattern.rs (2.98 ops/cycle)
 
 3. **Perf counter integration** (from W15 plan)
    - `perf.rs` exists but not used in production benchmarks
@@ -125,13 +128,24 @@ docs/wave-16/
 
 ## Commit Log (This Session)
 
+### Zoom Session (initial)
 1. **C-Pipe TODO clarification** — Documented future ops (CROUTE, CREDUCE, CCAST, CFENCE), explained fail-open policy
 2. **This document** — Tracking incremental improvements, maintaining momentum
 
-**Total code change:** 8 lines (6 comment lines + 2 structural)  
-**Total documentation:** This file (1.8 KB)
+### Zoom Nender Session
+3. **batch_query_pattern.rs** — Runnable demo of 3.0 ops/cycle batch query workload
+4. **hdc_inference_pattern.rs** — HDC weight-free inference at 2.97 ops/cycle
+5. **memory_heavy_pattern.rs** — Memory-bound gather-compute-scatter at 2.98 ops/cycle
 
-**Impact:** Better codebase clarity, roadmap for next implementer, sustained momentum.
+**Total code added:** 682 lines (3 complete examples)  
+**Total documentation:** This file (updated, now 2.2 KB)
+
+**Impact:** 
+- All 4 packing patterns from guide now have executable examples ✅
+- Developers can run, modify, and learn from real code
+- Low-hanging fruit item #2 COMPLETE
+- Pattern trifecta: batch queries, HDC inference, memory-heavy workloads
+- Sustained momentum across 5 commits (zoom → zoom → nender → zap → echo)
 
 ---
 
