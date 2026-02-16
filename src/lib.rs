@@ -104,6 +104,7 @@ pub use affinity::{CpuSet, pin_thread, get_affinity, num_cpus, num_physical_core
 pub mod phoenix_scheduler;
 pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, SentronMetrics as PhoenixMetrics, CoreMetrics,  SchedulerAction, MigrationReason};
 pub mod perf;
+#[cfg(test)]
 pub mod integration;
 pub mod assoc;
 pub mod cpu_sched;

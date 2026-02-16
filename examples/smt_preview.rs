@@ -9,7 +9,7 @@
 //!
 //! This is what W13-W18 will look like, built early.
 
-use vtpu_runtime::{AssociativeMemory, HyperVector, HDC_DEFAULT_WIDTH};
+use vtpu_runtime::{AssociativeMemory, HDC_DEFAULT_WIDTH};
 use std::time::Instant;
 use std::thread;
 use std::sync::{Arc, Mutex};

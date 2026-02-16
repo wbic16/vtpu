@@ -292,7 +292,7 @@ fn bench_real_inference() {
         ("vTPU", 2026),
     ];
 
-    for (i, (text, value)) in patterns.iter().enumerate() {
+    for (_i, (text, value)) in patterns.iter().enumerate() {
         // Hash text to coordinate
         let mut coord_data = [0u16; 11];
         for (j, byte) in text.bytes().enumerate().take(11) {

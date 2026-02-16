@@ -37,7 +37,7 @@ fn main() {
     for i in 0..20u8 {
         let curr = (i % 12) + 1;
         let next = (i % 12) + 2;
-        let prev = if i > 0 { (i - 1) % 12 + 1 } else { 14 };
+        let _prev = if i > 0 { (i - 1) % 12 + 1 } else { 14 };
 
         program.push(SIW::new(
             DenseOp::DMUL { rd: curr + 6, rs1: curr, rs2: curr }, // compute: square it

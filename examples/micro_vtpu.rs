@@ -76,6 +76,7 @@ struct SIW {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum DenseOp {
     NOP,
     ADD(u8, u8, u8),  // rd = rs1 + rs2
@@ -83,6 +84,7 @@ enum DenseOp {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum SparseOp {
     NOP,
     GATHER(u8, PhextCoord), // rd = mem[coord]
@@ -90,6 +92,7 @@ enum SparseOp {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 enum CoordOp {
     NOP,
     PACK(PhextCoord),   // Pack coordinate into message

@@ -28,8 +28,8 @@ fn main() {
     println!("Modern:  State machine navigation");
     println!();
     
-    let qian_qian = Hexagram::new(Trigram::Qian, Trigram::Qian);
-    let kun_kun = Hexagram::new(Trigram::Kun, Trigram::Kun);
+    let _qian_qian = Hexagram::new(Trigram::Qian, Trigram::Qian);
+    let _kun_kun = Hexagram::new(Trigram::Kun, Trigram::Kun);
     
     println!("  Hexagram 1: ☰☰ (Heaven/Heaven) — Pure yang, creative force");
     println!("  Hexagram 2: ☷☷ (Earth/Earth)   — Pure yin, receptive");

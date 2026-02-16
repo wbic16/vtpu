@@ -78,7 +78,7 @@ fn demo_sequence_prediction() {
     // Predict: Given 3 at position 2, what comes next?
     println!("\nQuery: value=3 at position 2");
     let query_coord = PhextCoord::new([3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
-    let query_hv = HyperVector::from_coord(&query_coord.dims(), HDC_DEFAULT_WIDTH);
+    let _query_hv = HyperVector::from_coord(&query_coord.dims(), HDC_DEFAULT_WIDTH);
     
     // Look ahead: find pattern at position 3
     let lookahead_coord = PhextCoord::new([0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0]); // position 3, any value

@@ -71,9 +71,9 @@ fn main() {
     println!("═══ Sample Hexagrams (8 × 8 = 64 total) ═══");
     println!();
     
-    let qian_qian = Hexagram::new(Trigram::Qian, Trigram::Qian);
-    let kun_kun = Hexagram::new(Trigram::Kun, Trigram::Kun);
-    let li_kan = Hexagram::new(Trigram::Li, Trigram::Kan);
+    let _qian_qian = Hexagram::new(Trigram::Qian, Trigram::Qian);
+    let _kun_kun = Hexagram::new(Trigram::Kun, Trigram::Kun);
+    let _li_kan = Hexagram::new(Trigram::Li, Trigram::Kan);
     
     println!("☰☰ Qian/Qian (Heaven/Heaven) — Pure Yang, Creative force");
     println!("☷☷ Kun/Kun (Earth/Earth) — Pure Yin, Receptive principle");

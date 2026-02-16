@@ -14,8 +14,9 @@ use std::fs::File;
 use std::io::Read;
 use std::path::PathBuf;
 use std::hint::black_box;
-use vtpu_runtime::{SIW, DenseOp, SparseOp, CoordOp, perf::{PerfCounters, PerfMetrics}};
+use vtpu_runtime::{SIW, DenseOp, SparseOp, CoordOp, perf::PerfCounters};
 
+#[allow(dead_code)]
 const CPU_FREQ_GHZ: f64 = 4.0; // Adjust for your hardware
 
 fn load_siw_file(path: &PathBuf) -> std::io::Result<Vec<SIW>> {

@@ -4,7 +4,6 @@
 //! Target: ≥2.5 ops/cycle by using all 3 pipes per SIW.
 
 use vtpu_runtime::*;
-use std::time::Instant;
 
 const TARGET_OPS_PER_CYCLE: f64 = 2.5;
 

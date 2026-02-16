@@ -59,7 +59,7 @@ fn test_pattern_completion() {
     assert!(result.similarity >= 0.0, "Similarity should be non-negative");
     
     // Verify output portion contains "world" (3)
-    if let Some(matched) = result.matched_coord {
+    if let Some(_matched) = result.matched_coord {
         // HDC retrieval is approximate — verify something was found
     }
 }
@@ -154,7 +154,7 @@ fn test_sequence_prediction() {
     assert!(result.matched_coord.is_some(), "Should find next in sequence");
     
     // Should find transition C→D
-    if let Some(matched) = result.matched_coord {
+    if let Some(_matched) = result.matched_coord {
         // HDC approximate — verify retrieval occurred
         
     }
@@ -185,7 +185,7 @@ fn test_multi_hop_reasoning() {
     let result1 = engine.think(&step1);
     
     assert!(result1.matched_coord.is_some());
-    let hop1 = result1.matched_coord.unwrap();
+    let _hop1 = result1.matched_coord.unwrap();
     // HDC approximate retrieval
     // Exact coord matching not guaranteed with HDC
     
@@ -199,7 +199,7 @@ fn test_multi_hop_reasoning() {
     let result2 = engine.think(&step2);
     
     assert!(result2.matched_coord.is_some());
-    let hop2 = result2.matched_coord.unwrap();
+    let _hop2 = result2.matched_coord.unwrap();
     // HDC approximate — chain found
     // Exact values not guaranteed
     

@@ -5,7 +5,7 @@
 //! This is the foundation of Phase 1: real multi-threaded execution
 //! using Egyptian decan geometry (2.25 decans per thread).
 
-use vtpu_runtime::{WedgeExecutor, Wedge, PhextCoord, SIW, SMT_THREADS, TOTAL_NODES};
+use vtpu_runtime::{WedgeExecutor, PhextCoord, SIW, SMT_THREADS, TOTAL_NODES};
 
 fn main() {
     println!("=== Wedge Model Demo ===\n");

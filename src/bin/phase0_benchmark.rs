@@ -10,8 +10,7 @@
 //! Validates Phase 0→1 gate requirement via real hardware measurements.
 
 use vtpu_runtime::{
-    cognitive::{CognitiveEngine, CognitiveStep},
-    AssociativeMemory, HyperVector, HDC_DEFAULT_WIDTH,
+    cognitive::{CognitiveEngine, CognitiveStep}, HDC_DEFAULT_WIDTH,
     hdc_optimized::{FastAssociativeMemory, encode_coord_fast},
     Memory, PhextCoord,
 };
