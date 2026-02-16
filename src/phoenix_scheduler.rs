@@ -388,7 +388,6 @@ impl std::fmt::Display for NineColorStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ppt::PPTStats;
     
     fn mock_sentron_metrics() -> SentronMetrics {
         SentronMetrics {

@@ -10,13 +10,8 @@
 //! 4. Report achieved ILP and pipe utilization
 
 use crate::siw::SIW;
-
 use crate::regalloc::{self, StreamAnalysis, Hazard, build_dep_graph, topological_sort};
 use crate::telemetry::VtpuTelemetry;
-#[cfg(test)]
-use crate::pipes::{DenseOp, SparseOp, CoordOp};
-#[cfg(test)]
-use crate::PhextCoord;
 
 /// vTPU Scheduler — dispatches SIWs to execution pipes
 pub struct Scheduler {
@@ -133,6 +128,7 @@ impl Default for Scheduler {
 mod tests {
     use super::*;
     use crate::pipes::*;
+    use crate::PhextCoord;
 
     fn mov(rd: u8, imm: i64) -> SIW {
         SIW::new(DenseOp::DMOV { rd, imm }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero())
