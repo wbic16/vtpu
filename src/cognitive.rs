@@ -105,6 +105,7 @@ impl CognitiveEngine {
     /// Plant a scroll in the lattice. This is how knowledge enters.
     /// No training loop. No gradient descent. Just: here is a thought,
     /// and here is where it lives.
+    #[inline]
     pub fn plant(&mut self, coord: [u16; 11]) {
         self.memory.store(coord, self.hd_width);
     }
@@ -122,6 +123,7 @@ impl CognitiveEngine {
     ///
     /// 6 cycles. 11 active ops. 1.83 ops/cycle (single step).
     /// With pipelining across steps: 2.5+ ops/cycle.
+    #[inline]
     pub fn think(&mut self, step: &CognitiveStep) -> CognitiveResult {
         self.steps += 1;
 
