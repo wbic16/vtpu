@@ -32,8 +32,9 @@ This guide shows you how to write pack-friendly code.
 
 ✅ **GOOD:** Alternate D/S/C operations
 ```
-DADD + SGATHER + CSLICE   // 3 ops per SIW (3.0 ops/cycle)
-DMUL + SROUTE + CPACK     // 3 ops per SIW (3.0 ops/cycle)
+DADD + SGATHER + CPACK         // 3 ops per SIW (3.0 ops/cycle)
+DMUL + SSCATTR + CREDUCE       // 3 ops per SIW (3.0 ops/cycle)
+DHDSIM + SASSOC + CROUTE       // 3 ops per SIW (3.0 ops/cycle)
 ```
 
 ❌ **BAD:** Consecutive ops from same pipe
@@ -47,9 +48,9 @@ DSUB    // 1 op per SIW (1.0 ops/cycle)
 
 ✅ **GOOD:** Independent register usage
 ```
-DADD r3 ← r1 + r2         // Write r3
-SGATHER r4 ← coord[0]     // Write r4 (independent)
-CSLICE r5 ← r0 & mask     // Write r5 (independent)
+DADD r3 ← r1 + r2              // Write r3
+SGATHER r4 ← coord[0]          // Write r4 (independent)
+CPACK r5 ← r6, r7, fmt=Raw     // Write r5 (independent)
 ```
 
 ❌ **BAD:** Read-after-write (RAW) hazard
@@ -91,64 +92,76 @@ SSCATTR coord[2] ← r3  + DADD r12 ← r3 + r4    + CFENCE
 
 ## Common Patterns
 
-### Pattern 1: Cognitive Loop
+### Pattern 1: Simple Pipeline (Load-Compute-Store)
 
-**Structure:** ENCODE → ATTEND → ROUTE → RETRIEVE → RESPOND → PERSIST
+**Structure:** Load data → Compute → Store result
 
-**Packing strategy:**
+**Bad packing (sequential):**
 ```
-Cycle 1 (D+S+C):
-  D-Pipe: DHDENC r1 ← coord[0]       // Encode query
-  S-Pipe: SGATHER r2 ← coord[1]      // Prefetch neighbors
-  C-Pipe: CSLICE r3 ← r0 & 0x7FF     // Attention mask
+Cycle 1 (S only):
+  S-Pipe: SGATHER r1 ← coord[0]      // Load operand 1
+  D-Pipe: DNOP
+  C-Pipe: CNOP
 
 Cycle 2 (S only):
-  S-Pipe: SROUTE r4 ← coord[0]       // Route to expert
-  D-Pipe: DNOP                        // (no independent D op)
-  C-Pipe: CNOP                        // (no independent C op)
-
-Cycle 3 (S only):
-  S-Pipe: SASSOC r5 ← r1             // Associative recall
+  S-Pipe: SGATHER r2 ← coord[1]      // Load operand 2
   D-Pipe: DNOP
   C-Pipe: CNOP
 
-Cycle 4 (D+S+C):
-  D-Pipe: DHDSIM r6 ← r1 ~ r5        // Similarity
-  S-Pipe: SGATHER r7 ← coord[2]      // Load target
-  C-Pipe: CPACK r8 ← r6, r4          // Pack result
+Cycle 3 (D only):
+  D-Pipe: DADD r3 ← r1 + r2          // Compute sum
+  S-Pipe: SNOP
+  C-Pipe: CNOP
 
-Cycle 5 (S only):
-  S-Pipe: SSCATTR coord[3] ← r8      // Persist
+Cycle 4 (S only):
+  S-Pipe: SSCATTR coord[2] ← r3      // Store result
   D-Pipe: DNOP
   C-Pipe: CNOP
 ```
 
-**Achieved:** 9 ops / 5 cycles = **1.8 ops/cycle**
+**Achieved:** 4 ops / 4 cycles = **1.0 ops/cycle** ❌
 
-**Issue:** Cycles 2, 3, 5 have only S-Pipe active (poor packing)
+**Good packing (mixed):**
+```
+Cycle 1 (D+S):
+  D-Pipe: DADD r3 ← r1 + r2          // Compute (uses pre-loaded r1, r2)
+  S-Pipe: SGATHER r4 ← coord[0]      // Prefetch next data
+  C-Pipe: CNOP
 
-**Improvement:** Interleave independent D/C ops during S-Pipe-heavy phases.
+Cycle 2 (D+S):
+  D-Pipe: DMUL r5 ← r3 * r4          // Continue pipeline
+  S-Pipe: SSCATTR coord[1] ← r3      // Write previous result
+  C-Pipe: CNOP
+```
 
-### Pattern 2: Batch Query (SQ-style)
+**Achieved:** 4 ops / 2 cycles = **2.0 ops/cycle** ✅
 
-**Structure:** Load 100 coords, compute similarity, route to best
+**Improvement:** Overlap load, compute, store in same SIWs.
+
+### Pattern 2: Batch Query (Similarity Scan)
+
+**Structure:** Load 100 candidates, compute similarity to query, track best match
 
 **Packing strategy:**
 ```
+// Pre-load query into r0
 for i in 0..100:
   Cycle i (D+S+C):
-    D-Pipe: DHDSIM r[i] ← query ~ candidate[i]
-    S-Pipe: SGATHER candidate[i+1] ← coord[i+1]   // Prefetch next
-    C-Pipe: CREDUCE best ← max(best, r[i])
+    D-Pipe: DHDSIM r100 ← r0 ~ r[i]            // Similarity to current
+    S-Pipe: SGATHER r[i+1] ← coord[i+1]        // Prefetch next candidate
+    C-Pipe: CREDUCE r101 ← max(r101, r100, g0) // Track best score
 ```
 
 **Achieved:** 300 ops / 100 cycles = **3.0 ops/cycle** ✅
 
-**Why it works:** All three pipes active every cycle, no dependencies.
+**Why it works:** 
+- All three pipes active every cycle
+- No register dependencies (r100, r101 independent from r[i])
+- Memory accesses to different coordinates (no conflicts)
 
-### Pattern 3: Memory-Heavy
+### Pattern 3: Memory-Heavy (Batch Gather + Accumulate)
 
-**Structure:** Gather 100 coords, compute sum, scatter result
+**Structure:** Gather 100 coords, compute running sum, scatter result
 
 **Bad approach (sequential):**
 ```
@@ -165,38 +178,48 @@ Total: 201 ops / 201 cycles = 1.0 ops/cycle ❌
 
 **Good approach (packed):**
 ```
+r10 = 0  // accumulator
+
 for i in 0..100:
-  Cycle i (D+S+C):
-    D-Pipe: DADD sum ← sum + r[i-1]      // Accumulate
-    S-Pipe: SGATHER r[i] ← coord[i]      // Load next
-    C-Pipe: CROUTE hint ← sum            // Routing hint
+  Cycle i (D+S):
+    D-Pipe: DADD r10 ← r10 + r[i]        // Accumulate previous
+    S-Pipe: SGATHER r[i+1] ← coord[i+1]  // Load next (pipelined)
 
 Cycle 101 (S only):
-  S-Pipe: SSCATTR coord[100] ← sum
+  S-Pipe: SSCATTR coord[100] ← r10       // Write final sum
 
-Total: 301 ops / 101 cycles = 2.98 ops/cycle ✅
+Total: 201 ops / 101 cycles = 1.99 ops/cycle ✅
 ```
 
-### Pattern 4: HDC Inference
+**Note:** Can add C-Pipe ops for 3.0 ops/cycle if coordination needed.
+
+### Pattern 4: HDC Inference (Encode + Scan + Route)
 
 **Structure:** Encode query, scan 100 candidates, find best match
 
 **Packing strategy:**
 ```
 Cycle 0 (D only):
-  D-Pipe: DHDENC query ← coord[0]
+  D-Pipe: DHDENC r0 ← r1             // Encode query (input in r1)
+  S-Pipe: SNOP
+  C-Pipe: CNOP
 
+// Pre-load first candidate into r10
 for i in 0..100:
   Cycle i (D+S+C):
-    D-Pipe: DHDSIM sim[i] ← query ~ candidate[i]
-    S-Pipe: SGATHER candidate[i+1] ← coord[i+1]
-    C-Pipe: CREDUCE best ← max(best, sim[i])
+    D-Pipe: DHDSIM r100 ← r0, r10            // Similarity to candidate
+    S-Pipe: SGATHER r10 ← coord[i+1]         // Load next candidate
+    C-Pipe: CREDUCE r101 ← max(r101, r100, g0) // Track best
 
 Cycle 101 (S only):
-  S-Pipe: SROUTE result ← coord[best]
+  S-Pipe: SROUTE r102 ← r101               // Route based on best score
+  D-Pipe: DNOP
+  C-Pipe: CNOP
 
 Total: 303 ops / 102 cycles = 2.97 ops/cycle ✅
 ```
+
+**Note:** SROUTE uses embedding in r101 to find routing destination.
 
 ---
 
@@ -223,11 +246,11 @@ Average: 1.0 ops/cycle ❌
 
 ✅ **Do interleave pipe types:**
 ```
-SGATHER r1 ← coord[0]  + DADD r4 ← r8 + r9   + CSLICE r10 ← r0
-SGATHER r2 ← coord[1]  + DMUL r5 ← r4 * r2   + CPACK r11 ← r5, r1
-SSCATTR coord[3] ← r5  + DNOP                + CFENCE
+SIW 1: DADD r4 ← r8 + r9  |  SGATHER r1 ← coord[0]  |  CPACK r10 ← r8, r9, Raw
+SIW 2: DMUL r5 ← r4 * r2  |  SGATHER r2 ← coord[1]  |  CREDUCE r11 ← r5, Sum, g0
+SIW 3: DNOP               |  SSCATTR coord[3] ← r5  |  CFENCE Local
 
-Average: 2.7 ops/cycle ✅
+Average: 8 ops / 3 cycles = 2.7 ops/cycle ✅
 ```
 
 ### Anti-Pattern 2: Data Dependencies
@@ -243,9 +266,9 @@ Result: 3 ops / 3 cycles = 1.0 ops/cycle ❌
 
 ✅ **Do use independent registers:**
 ```
-SIW 1: DADD r3 ← r1 + r2  + SGATHER r6 ← coord[0] + CSLICE r9 ← r0
-SIW 2: DMUL r4 ← r7 * r8  + SGATHER r10 ← coord[1] + CPACK r11 ← r3, r4
-SIW 3: DSUB r5 ← r3 - r4  + SSCATTR coord[2] ← r5  + CREDUCE r12 ← max(r11)
+SIW 1: DADD r3 ← r1 + r2  |  SGATHER r6 ← coord[0]  |  CPACK r9 ← r1, r2, Raw
+SIW 2: DMUL r4 ← r7 * r8  |  SGATHER r10 ← coord[1] |  CREDUCE r11 ← r3, Max, g0
+SIW 3: DSUB r5 ← r3 - r4  |  SSCATTR coord[2] ← r5  |  CCAST r11, g0
 
 Result: 9 ops / 3 cycles = 3.0 ops/cycle ✅
 ```
@@ -262,8 +285,8 @@ Result: 2 ops / 2 cycles = 1.0 ops/cycle ❌
 
 ✅ **Do write to different coordinates:**
 ```
-SSCATTR coord[0] ← r1  + DADD r3 ← r1 + r2  + CSLICE r4 ← r0
-SSCATTR coord[1] ← r2  + DMUL r5 ← r3 * r2  + CPACK r6 ← r3, r5
+SIW 1: DADD r3 ← r1 + r2  |  SSCATTR coord[0] ← r1  |  CPACK r4 ← r1, r2, Raw
+SIW 2: DMUL r5 ← r3 * r2  |  SSCATTR coord[1] ← r2  |  CREDUCE r6 ← r5, Max, g0
 
 Result: 6 ops / 2 cycles = 3.0 ops/cycle ✅
 ```
@@ -299,13 +322,19 @@ When writing vTPU code, ask:
 ## Packer Usage
 
 ```rust
+use vtpu_runtime::*;
 use vtpu_runtime::packer::{ScalarOp, pack};
 
 // Build unpacked ops
 let mut ops = Vec::new();
 ops.push(ScalarOp::D(DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 }));
 ops.push(ScalarOp::S(SparseOp::SGATHER { rd: 4, coord_idx: 0, width: 64 }));
-ops.push(ScalarOp::C(CoordOp::CSLICE { rd: 5, rs: 0, mask: 0xFF }));
+ops.push(ScalarOp::C(CoordOp::CPACK { 
+    rd: 5, 
+    rs1: 1, 
+    rs2: 4, 
+    fmt: MessageFormat::Raw 
+}));
 
 // Pack automatically
 let packed = pack(&ops);
@@ -315,6 +344,7 @@ println!("Packed SIWs: {}", packed.packed_siws);
 println!("Utilization: {:.1}%", packed.utilization * 100.0);
 
 // Execute packed stream
+let mut mem = Memory::new();
 let mut sentron = Sentron::new(0, PhextCoord::zero(), 0, 0);
 sentron.spawn(packed.stream);
 let stats = exec::run(&mut sentron, &mut mem);
