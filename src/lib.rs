@@ -103,6 +103,7 @@ pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub use topology::{CpuTopology, PhysicalCore, NumaNode};
 pub use runtime_scheduler::{RuntimeScheduler, RuntimeConfig, SchedulerPolicy, Assignment, SchedulerStats};
 pub use scheduler_redux::{SchedulerRedux, ReduxConfig, SentronMetrics, CoreMetrics, SchedulerAction, MigrationReason};
+pub use scheduler::{WorkloadClass, WorkloadStats, CoopResult, execute_cooperative, execute_pair_cooperative};
 pub mod pool;
 pub use pool::SentronPool;
 pub mod affinity;

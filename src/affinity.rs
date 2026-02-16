@@ -165,6 +165,60 @@ pub fn zen4_topology(logical_core: usize) -> (usize, usize) {
     }
 }
 
+/// Full topology from sysfs (zero deps).
+/// Returns Vec of (logical_cpu, physical_core_id, numa_node).
+pub fn detect_topology() -> Vec<(usize, usize, usize)> {
+    let mut result = Vec::new();
+    let cpu_dir = "/sys/devices/system/cpu";
+
+    for i in 0..256 {
+        let core_path = format!("{}/cpu{}/topology/core_id", cpu_dir, i);
+        let core_id = match std::fs::read_to_string(&core_path) {
+            Ok(s) => s.trim().parse::<usize>().unwrap_or(i),
+            Err(_) => break,
+        };
+        let numa_path = format!("{}/cpu{}/topology/physical_package_id", cpu_dir, i);
+        let numa = std::fs::read_to_string(&numa_path)
+            .ok()
+            .and_then(|s| s.trim().parse::<usize>().ok())
+            .unwrap_or(0);
+        result.push((i, core_id, numa));
+    }
+    result
+}
+
+/// SMT sibling pairs from sysfs topology.
+pub fn smt_pairs() -> Vec<(usize, usize)> {
+    let topo = detect_topology();
+    let mut core_map: std::collections::HashMap<usize, Vec<usize>> = std::collections::HashMap::new();
+    for &(cpu, core_id, _) in &topo {
+        core_map.entry(core_id).or_default().push(cpu);
+    }
+    let mut pairs = Vec::new();
+    for (_, cpus) in &core_map {
+        if cpus.len() >= 2 {
+            pairs.push((cpus[0], cpus[1]));
+        }
+    }
+    pairs.sort();
+    pairs
+}
+
+/// L1/L2/L3 cache sizes from sysfs (in KB).
+pub fn cache_sizes() -> (usize, usize, usize) {
+    let read_kb = |idx: usize| -> usize {
+        let path = format!("/sys/devices/system/cpu/cpu0/cache/index{}/size", idx);
+        std::fs::read_to_string(&path)
+            .ok()
+            .and_then(|s| {
+                let s = s.trim().trim_end_matches('K');
+                s.parse::<usize>().ok()
+            })
+            .unwrap_or(0)
+    };
+    (read_kb(0), read_kb(2), read_kb(3)) // index0=L1d, index2=L2, index3=L3
+}
+
 /// Thread yield hint — cooperate with the OS scheduler.
 /// On x86: PAUSE instruction (saves power, signals spinwait).
 pub fn yield_hint() {
@@ -248,5 +302,31 @@ mod tests {
     #[test]
     fn yield_doesnt_crash() {
         yield_hint();
+    }
+
+    #[test]
+    fn topology_detection() {
+        let topo = detect_topology();
+        assert!(!topo.is_empty(), "Should detect at least one CPU");
+        // First entry should be cpu0
+        assert_eq!(topo[0].0, 0);
+    }
+
+    #[test]
+    fn smt_pairs_detected() {
+        let pairs = smt_pairs();
+        let physical = num_physical_cores();
+        let logical = num_cpus();
+        if logical > physical {
+            assert!(!pairs.is_empty(), "SMT is on, should find pairs");
+        }
+    }
+
+    #[test]
+    fn cache_detection() {
+        let (l1, l2, l3) = cache_sizes();
+        // Zen 4: L1=32K, L2=1024K, L3=16384K
+        assert!(l1 > 0, "Should detect L1 cache");
+        assert!(l2 > 0, "Should detect L2 cache");
     }
 }

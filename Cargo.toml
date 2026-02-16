@@ -8,10 +8,8 @@ description = "vTPU: Software-defined virtual TPU with phext-native addressing"
 repository = "https://github.com/wbic16/vtpu"
 
 [dependencies]
-# Zero external dependencies for core runtime. Keep it that way.
-# OS scheduler integration (W17) requires platform APIs:
-libc = "0.2"        # Linux: sched_setaffinity, pthread_setname_np
-num_cpus = "1.16"   # Cross-platform: hardware thread count
+# Zero external dependencies. Keep it that way.
+# OS scheduler integration uses raw syscalls + sysfs (see affinity.rs).
 
 # Performance monitoring (TODO Wave 3: integrate perf counters)
 # perf-event = "0.4"
