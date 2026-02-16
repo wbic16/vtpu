@@ -2,8 +2,15 @@
 //!
 //! Coordinates with the operating system scheduler for optimal thread placement.
 //! Provides CPU topology discovery, thread affinity, and NUMA awareness.
+//!
+//! R23W17-2: Cooperative scheduling with workload classification and quantized execution.
+
+pub mod workload;
+pub mod cooperative;
 
 use std::collections::HashMap;
+pub use workload::{WorkloadClass, WorkloadStats, quantize_stream, should_yield, DEFAULT_QUANTUM};
+pub use cooperative::{execute_cooperative, execute_pair_cooperative, CoopResult};
 
 /// CPU topology information
 #[derive(Debug, Clone)]
