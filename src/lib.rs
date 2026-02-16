@@ -99,6 +99,8 @@ pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES}
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub mod pool;
 pub use pool::SentronPool;
+pub mod affinity;
+pub use affinity::{CpuSet, pin_thread, get_affinity, num_cpus, num_physical_cores, yield_hint};
 pub mod perf;
 pub mod integration;
 pub mod assoc;
