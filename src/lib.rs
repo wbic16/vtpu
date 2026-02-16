@@ -102,3 +102,4 @@ pub use pool::SentronPool;
 pub mod perf;
 pub mod integration;
 pub mod assoc;
+pub mod cpu_sched;
