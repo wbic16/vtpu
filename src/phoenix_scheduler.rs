@@ -1,416 +1,326 @@
 //! Phoenix Scheduler — Nine-Color Harmonic Coordination
 //!
-//! Embodies the Phoenix of Nine Colors metaphor from W9, applied to CPU scheduling.
+//! Embodies the Phoenix of Nine Colors: 9 scheduling dimensions
+//! blend into one coordinated decision via harmonic scoring.
 //!
-//! Nine dimensions of coordination:
-//! 🔴 Red:    ILP (instruction-level parallelism)
-//! 🟠 Orange: Core affinity (load balancing)
+//! 🔴 Red:    ILP (ops per cycle)
+//! 🟠 Orange: Core affinity (load balance)
 //! 🟡 Yellow: SMT pairing (complementary workloads)
-//! 🟢 Green:  Cache locality (hit rates)
+//! 🟢 Green:  Cache locality (PPT hit rate)
 //! 🔵 Blue:   NUMA topology (memory locality)
 //! 🟣 Purple: Temporal trends (learning from history)
-//! 🟤 Brown:  Thermal management (temperature)
-//! ⚫ Black:  Power efficiency (energy)
-//! ⚪ White:  Cluster coordination (multi-node)
-//!
-//! Philosophy: Harmonic blend of all 9 colors → global optimal decision
+//! 🟤 Brown:  Thermal management (placeholder)
+//! ⚫ Black:  Power efficiency (placeholder)
+//! ⚪ White:  Cluster coordination (placeholder)
 
-use crate::scheduler_redux::{SentronMetrics, CoreMetrics, SchedulerAction, MigrationReason};
-use std::collections::HashMap;
+use crate::exec::ExecStats;
+use crate::ppt::PPTStats;
 
-/// Nine-dimensional decision vector
+/// Performance snapshot for a sentron execution.
+#[derive(Debug, Clone)]
+pub struct SentronMetrics {
+    pub sentron_id: u16,
+    pub core_id: usize,
+    pub ops_retired: u64,
+    pub cycles: u64,
+    pub ops_per_cycle: f64,
+    pub d_util: f64,
+    pub s_util: f64,
+    pub c_util: f64,
+    pub ptc_hit_rate: f64,
+}
+
+impl SentronMetrics {
+    pub fn from_exec(sentron_id: u16, core_id: usize, stats: &ExecStats, ppt: &PPTStats) -> Self {
+        SentronMetrics {
+            sentron_id,
+            core_id,
+            ops_retired: stats.ops_retired,
+            cycles: stats.cycles,
+            ops_per_cycle: stats.ops_per_cycle(),
+            d_util: if stats.siws_retired > 0 { stats.d_ops as f64 / stats.siws_retired as f64 } else { 0.0 },
+            s_util: if stats.siws_retired > 0 { stats.s_ops as f64 / stats.siws_retired as f64 } else { 0.0 },
+            c_util: if stats.siws_retired > 0 { stats.c_ops as f64 / stats.siws_retired as f64 } else { 0.0 },
+            ptc_hit_rate: ppt.ptc_hit_rate,
+        }
+    }
+
+    /// Simple constructor for testing/benchmarks without PPT.
+    pub fn from_exec_simple(sentron_id: u16, core_id: usize, stats: &ExecStats) -> Self {
+        SentronMetrics {
+            sentron_id,
+            core_id,
+            ops_retired: stats.ops_retired,
+            cycles: stats.cycles,
+            ops_per_cycle: stats.ops_per_cycle(),
+            d_util: if stats.siws_retired > 0 { stats.d_ops as f64 / stats.siws_retired as f64 } else { 0.0 },
+            s_util: if stats.siws_retired > 0 { stats.s_ops as f64 / stats.siws_retired as f64 } else { 0.0 },
+            c_util: if stats.siws_retired > 0 { stats.c_ops as f64 / stats.siws_retired as f64 } else { 0.0 },
+            ptc_hit_rate: 1.0,
+        }
+    }
+
+    /// Are D and S pipes complementary? (one high, one low = good SMT pair)
+    pub fn is_complementary(&self) -> bool {
+        (self.d_util - self.s_util).abs() > 0.3
+    }
+}
+
+/// Aggregate metrics for a physical core.
+#[derive(Debug, Clone)]
+pub struct CoreMetrics {
+    pub core_id: usize,
+    pub sentron_count: usize,
+    pub total_ops: u64,
+    pub avg_ops_per_cycle: f64,
+    pub avg_ptc_hit_rate: f64,
+}
+
+impl CoreMetrics {
+    pub fn from_sentrons(core_id: usize, metrics: &[SentronMetrics]) -> Self {
+        let count = metrics.len();
+        if count == 0 {
+            return CoreMetrics {
+                core_id, sentron_count: 0, total_ops: 0,
+                avg_ops_per_cycle: 0.0, avg_ptc_hit_rate: 0.0,
+            };
+        }
+        let total_ops: u64 = metrics.iter().map(|m| m.ops_retired).sum();
+        let avg_opc = metrics.iter().map(|m| m.ops_per_cycle).sum::<f64>() / count as f64;
+        let avg_ptc = metrics.iter().map(|m| m.ptc_hit_rate).sum::<f64>() / count as f64;
+        CoreMetrics {
+            core_id, sentron_count: count, total_ops,
+            avg_ops_per_cycle: avg_opc, avg_ptc_hit_rate: avg_ptc,
+        }
+    }
+}
+
+/// Nine-dimensional decision vector — one score per color.
 #[derive(Debug, Clone)]
 pub struct NineColorDecision {
-    /// 🔴 Red: ILP (ops per cycle)
-    pub ilp_score: f64,
-    
-    /// 🟠 Orange: Core affinity (load balance)
-    pub core_affinity: f64,
-    
-    /// 🟡 Yellow: SMT pairing efficiency
-    pub smt_pairing: f64,
-    
-    /// 🟢 Green: Cache locality (hit rate)
-    pub cache_locality: f64,
-    
-    /// 🔵 Blue: NUMA locality (local vs remote)
-    pub numa_locality: f64,
-    
-    /// 🟣 Purple: Temporal trend (improving/degrading)
-    pub temporal_trend: f64,
-    
-    /// 🟤 Brown: Thermal health (temperature delta)
-    pub thermal_delta: f64,
-    
-    /// ⚫ Black: Power efficiency (joules per op)
-    pub power_efficiency: f64,
-    
-    /// ⚪ White: Cluster balance (multi-node)
-    pub cluster_balance: f64,
+    pub ilp: f64,           // 🔴 Red
+    pub core_affinity: f64, // 🟠 Orange
+    pub smt_pairing: f64,   // 🟡 Yellow
+    pub cache_locality: f64,// 🟢 Green
+    pub numa_locality: f64, // 🔵 Blue
+    pub temporal_trend: f64,// 🟣 Purple
+    pub thermal: f64,       // 🟤 Brown
+    pub power: f64,         // ⚫ Black
+    pub cluster: f64,       // ⚪ White
 }
 
 impl NineColorDecision {
-    /// Create decision from sentron metrics
-    pub fn from_metrics(
-        sentron: &SentronMetrics,
-        core: &CoreMetrics,
-        history: &[SentronMetrics],
-    ) -> Self {
-        Self {
-            ilp_score: Self::score_ilp(sentron),
-            core_affinity: Self::score_core_affinity(core),
-            smt_pairing: Self::score_smt_pairing(sentron, core),
-            cache_locality: Self::score_cache_locality(sentron),
-            numa_locality: 1.0, // TODO: Implement NUMA detection
-            temporal_trend: Self::score_temporal_trend(history),
-            thermal_delta: 1.0, // TODO: Read /sys/class/thermal/
-            power_efficiency: 1.0, // TODO: Read /sys/class/powercap/
-            cluster_balance: 1.0, // TODO: Multi-node coordination
+    /// Score from a sentron + core snapshot.
+    pub fn from_metrics(sentron: &SentronMetrics, core: &CoreMetrics, history: &[f64]) -> Self {
+        NineColorDecision {
+            ilp: (sentron.ops_per_cycle / 3.0).min(1.0),
+            core_affinity: if core.sentron_count > 0 {
+                1.0 - (core.sentron_count as f64 / 360.0).min(1.0)
+            } else { 1.0 },
+            smt_pairing: if sentron.is_complementary() { 1.0 } else { 0.5 },
+            cache_locality: sentron.ptc_hit_rate,
+            numa_locality: 1.0,  // single-node for now
+            temporal_trend: Self::score_trend(history),
+            thermal: 1.0,       // placeholder — future: /sys/class/thermal/
+            power: 1.0,         // placeholder — future: /sys/class/powercap/
+            cluster: 1.0,       // placeholder — future: multi-node
         }
     }
-    
-    /// 🔴 ILP: Higher ops/cycle = better
-    fn score_ilp(sentron: &SentronMetrics) -> f64 {
-        let target = 3.0;
-        (sentron.ops_per_cycle / target).min(1.0)
+
+    fn score_trend(history: &[f64]) -> f64 {
+        if history.len() < 2 { return 0.5; }
+        let recent = history[history.len() - 1];
+        let prior = history[history.len() - 2];
+        if prior == 0.0 { return 0.5; }
+        let ratio = recent / prior;
+        // >1.0 = improving, <1.0 = degrading
+        (ratio / 2.0).min(1.0)
     }
-    
-    /// 🟠 Core affinity: Balanced load = better
-    fn score_core_affinity(core: &CoreMetrics) -> f64 {
-        // Lower load = higher score (prefer moving to less-loaded cores)
-        let max_load = 8.0; // Assume max 8 sentrons per core
-        1.0 - (core.load / max_load).min(1.0)
-    }
-    
-    /// 🟡 SMT pairing: Complementary workloads = better
-    fn score_smt_pairing(sentron: &SentronMetrics, core: &CoreMetrics) -> f64 {
-        // If core has >1 sentron, check if workloads are complementary
-        if core.sentron_count > 1 {
-            // High stall rate suggests contention (same workload type)
-            1.0 - sentron.stall_rate()
-        } else {
-            1.0 // No contention if alone
-        }
-    }
-    
-    /// 🟢 Cache locality: Higher hit rate = better
-    fn score_cache_locality(sentron: &SentronMetrics) -> f64 {
-        sentron.cache_hit_rate()
-    }
-    
-    /// 🟣 Temporal trend: Improving = 1.0, degrading = 0.0
-    fn score_temporal_trend(history: &[SentronMetrics]) -> f64 {
-        if history.len() < 3 {
-            return 0.5; // Neutral if insufficient history
-        }
-        
-        // Compare recent average to older average
-        let recent = &history[history.len() - 3..];
-        let older = &history[..history.len() - 3];
-        
-        let recent_avg = recent.iter().map(|m| m.ops_per_cycle).sum::<f64>() / recent.len() as f64;
-        let older_avg = older.iter().map(|m| m.ops_per_cycle).sum::<f64>() / older.len() as f64;
-        
-        if recent_avg > older_avg {
-            1.0 // Improving
-        } else if recent_avg < older_avg * 0.9 {
-            0.0 // Degrading significantly
-        } else {
-            0.5 // Stable
-        }
-    }
-    
-    /// Harmonic blend: all 9 colors → single score
+
+    /// Harmonic blend — weighted sum of all 9 colors.
+    /// Weights reflect W17 findings: cache and ILP matter most,
+    /// thermal/power/cluster are placeholders until measured.
     pub fn harmonic_score(&self) -> f64 {
-        // Weight each color by importance (tunable)
         let weights = [
-            (self.ilp_score, 1.0),
-            (self.core_affinity, 1.0),
-            (self.smt_pairing, 1.0),
-            (self.cache_locality, 1.2),  // Cache matters more
-            (self.numa_locality, 0.8),
-            (self.temporal_trend, 0.5),  // Historical trend is advisory
-            (self.thermal_delta, 0.3),   // Thermal is soft constraint
-            (self.power_efficiency, 0.3),
-            (self.cluster_balance, 0.5),
+            1.0,  // 🔴 ILP
+            0.8,  // 🟠 Core affinity
+            0.9,  // 🟡 SMT pairing
+            1.2,  // 🟢 Cache locality (highest — W17 proved it matters)
+            0.7,  // 🔵 NUMA
+            0.6,  // 🟣 Temporal trend
+            0.3,  // 🟤 Thermal (placeholder)
+            0.3,  // ⚫ Power (placeholder)
+            0.5,  // ⚪ Cluster (placeholder)
         ];
-        
-        let mut weighted_sum = 0.0;
-        let mut weight_sum = 0.0;
-        
-        for (score, weight) in &weights {
-            weighted_sum += score * weight;
-            weight_sum += weight;
-        }
-        
-        weighted_sum / weight_sum
+        let scores = [
+            self.ilp, self.core_affinity, self.smt_pairing,
+            self.cache_locality, self.numa_locality, self.temporal_trend,
+            self.thermal, self.power, self.cluster,
+        ];
+        let weighted_sum: f64 = scores.iter().zip(weights.iter()).map(|(s, w)| s * w).sum();
+        let total_weight: f64 = weights.iter().sum();
+        weighted_sum / total_weight
     }
-    
-    /// Recommend action based on harmonic score
-    pub fn recommend_action(&self, sentron_id: u16, current_core: usize, threshold: f64) -> Option<SchedulerAction> {
-        let score = self.harmonic_score();
-        
-        if score < threshold {
-            // Performance below threshold → consider migration
-            
-            // Determine primary reason for poor performance
-            let reason = if self.cache_locality < 0.7 {
-                MigrationReason::CacheThrash
-            } else if self.core_affinity < 0.5 {
-                MigrationReason::LoadImbalance
-            } else if self.smt_pairing < 0.5 {
-                MigrationReason::Contention
-            } else {
-                MigrationReason::LoadImbalance // Default
-            };
-            
-            // For now, suggest migrating to "best available" core
-            // (Real implementation would query runtime scheduler for target)
-            Some(SchedulerAction::Migrate {
-                sentron_id,
-                from_core: current_core,
-                to_core: 0, // Placeholder - should be determined by core_affinity score
-                reason,
-            })
-        } else {
-            None // Performance acceptable
-        }
+
+    /// All nine scores as an array.
+    pub fn as_array(&self) -> [f64; 9] {
+        [self.ilp, self.core_affinity, self.smt_pairing,
+         self.cache_locality, self.numa_locality, self.temporal_trend,
+         self.thermal, self.power, self.cluster]
     }
 }
 
-/// Phoenix Scheduler - Nine-color harmonic coordinator
+/// Recommended action from the Phoenix scheduler.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PhoenixAction {
+    /// Stay put — everything is resonating.
+    Hold,
+    /// Migrate sentron to a different core.
+    Migrate { sentron_id: u16, to_core: usize, reason: String },
+    /// Rebalance the fleet across cores.
+    Rebalance,
+}
+
+/// The Phoenix Scheduler — coordinates via harmonic resonance.
 pub struct PhoenixScheduler {
-    /// Performance history per sentron (for temporal trends)
-    history: HashMap<u16, Vec<SentronMetrics>>,
-    
-    /// Decision history (for learning)
-    decisions: Vec<(u16, NineColorDecision)>,
-    
-    /// Threshold for triggering actions (0.0 - 1.0)
-    action_threshold: f64,
+    /// Decision history per sentron.
+    history: std::collections::HashMap<u16, Vec<f64>>,
+    /// Minimum harmonic score before recommending migration.
+    migration_threshold: f64,
 }
 
 impl PhoenixScheduler {
-    pub fn new(action_threshold: f64) -> Self {
-        Self {
-            history: HashMap::new(),
-            decisions: Vec::new(),
-            action_threshold,
+    pub fn new() -> Self {
+        PhoenixScheduler {
+            history: std::collections::HashMap::new(),
+            migration_threshold: 0.5,
         }
     }
-    
-    /// Feed metrics and make decision
-    pub fn decide(
-        &mut self,
-        sentron: &SentronMetrics,
-        core: &CoreMetrics,
-    ) -> Option<SchedulerAction> {
-        // Store in history
-        let history = self.history.entry(sentron.sentron_id).or_insert_with(Vec::new);
-        history.push(sentron.clone());
-        
-        // Trim to last 10 samples
-        if history.len() > 10 {
-            history.remove(0);
-        }
-        
-        // Create nine-color decision
-        let decision = NineColorDecision::from_metrics(sentron, core, history);
-        
-        // Store decision
-        self.decisions.push((sentron.sentron_id, decision.clone()));
-        
-        // Trim decision log
-        if self.decisions.len() > 100 {
-            self.decisions.remove(0);
-        }
-        
-        // Recommend action
-        decision.recommend_action(sentron.sentron_id, core.core_id, self.action_threshold)
-    }
-    
-    /// Get decision history for a sentron
-    pub fn decision_history(&self, sentron_id: u16) -> Vec<&NineColorDecision> {
-        self.decisions
-            .iter()
-            .filter(|(id, _)| *id == sentron_id)
-            .map(|(_, d)| d)
-            .collect()
-    }
-}
 
-/// Nine-color statistics (for observability)
-#[derive(Debug, Clone)]
-pub struct NineColorStats {
-    pub avg_ilp: f64,
-    pub avg_core_affinity: f64,
-    pub avg_smt_pairing: f64,
-    pub avg_cache_locality: f64,
-    pub avg_numa_locality: f64,
-    pub avg_temporal_trend: f64,
-    pub avg_thermal_delta: f64,
-    pub avg_power_efficiency: f64,
-    pub avg_cluster_balance: f64,
-    pub avg_harmonic_score: f64,
-}
+    /// Evaluate a sentron and recommend an action.
+    pub fn evaluate(&mut self, sentron: &SentronMetrics, core: &CoreMetrics) -> (NineColorDecision, PhoenixAction) {
+        let hist = self.history.entry(sentron.sentron_id).or_default();
+        let decision = NineColorDecision::from_metrics(sentron, core, hist);
+        let score = decision.harmonic_score();
 
-impl NineColorStats {
-    pub fn from_decisions(decisions: &[NineColorDecision]) -> Self {
-        if decisions.is_empty() {
-            return Self::default();
-        }
-        
-        let n = decisions.len() as f64;
-        
-        Self {
-            avg_ilp: decisions.iter().map(|d| d.ilp_score).sum::<f64>() / n,
-            avg_core_affinity: decisions.iter().map(|d| d.core_affinity).sum::<f64>() / n,
-            avg_smt_pairing: decisions.iter().map(|d| d.smt_pairing).sum::<f64>() / n,
-            avg_cache_locality: decisions.iter().map(|d| d.cache_locality).sum::<f64>() / n,
-            avg_numa_locality: decisions.iter().map(|d| d.numa_locality).sum::<f64>() / n,
-            avg_temporal_trend: decisions.iter().map(|d| d.temporal_trend).sum::<f64>() / n,
-            avg_thermal_delta: decisions.iter().map(|d| d.thermal_delta).sum::<f64>() / n,
-            avg_power_efficiency: decisions.iter().map(|d| d.power_efficiency).sum::<f64>() / n,
-            avg_cluster_balance: decisions.iter().map(|d| d.cluster_balance).sum::<f64>() / n,
-            avg_harmonic_score: decisions.iter().map(|d| d.harmonic_score()).sum::<f64>() / n,
-        }
+        hist.push(score);
+        if hist.len() > 16 { hist.remove(0); }
+
+        let action = if score < self.migration_threshold {
+            PhoenixAction::Migrate {
+                sentron_id: sentron.sentron_id,
+                to_core: 0, // simplistic — pick least loaded
+                reason: format!("harmonic score {:.3} < threshold {:.3}", score, self.migration_threshold),
+            }
+        } else {
+            PhoenixAction::Hold
+        };
+
+        (decision, action)
     }
-}
 
-impl Default for NineColorStats {
-    fn default() -> Self {
-        Self {
-            avg_ilp: 0.0,
-            avg_core_affinity: 0.0,
-            avg_smt_pairing: 0.0,
-            avg_cache_locality: 0.0,
-            avg_numa_locality: 0.0,
-            avg_temporal_trend: 0.0,
-            avg_thermal_delta: 0.0,
-            avg_power_efficiency: 0.0,
-            avg_cluster_balance: 0.0,
-            avg_harmonic_score: 0.0,
-        }
+    /// Evaluate an entire fleet and return aggregate recommendation.
+    pub fn evaluate_fleet(&mut self, fleet: &[(SentronMetrics, CoreMetrics)]) -> Vec<(NineColorDecision, PhoenixAction)> {
+        fleet.iter().map(|(s, c)| self.evaluate(s, c)).collect()
     }
-}
 
-impl std::fmt::Display for NineColorStats {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Nine-Color Statistics:")?;
-        writeln!(f, "  🔴 ILP:            {:.1}%", self.avg_ilp * 100.0)?;
-        writeln!(f, "  🟠 Core affinity:  {:.1}%", self.avg_core_affinity * 100.0)?;
-        writeln!(f, "  🟡 SMT pairing:    {:.1}%", self.avg_smt_pairing * 100.0)?;
-        writeln!(f, "  🟢 Cache locality: {:.1}%", self.avg_cache_locality * 100.0)?;
-        writeln!(f, "  🔵 NUMA locality:  {:.1}%", self.avg_numa_locality * 100.0)?;
-        writeln!(f, "  🟣 Temporal trend: {:.1}%", self.avg_temporal_trend * 100.0)?;
-        writeln!(f, "  🟤 Thermal:        {:.1}%", self.avg_thermal_delta * 100.0)?;
-        writeln!(f, "  ⚫ Power:          {:.1}%", self.avg_power_efficiency * 100.0)?;
-        writeln!(f, "  ⚪ Cluster:        {:.1}%", self.avg_cluster_balance * 100.0)?;
-        writeln!(f)?;
-        writeln!(f, "  Harmonic score:    {:.1}%", self.avg_harmonic_score * 100.0)?;
-        Ok(())
+    pub fn history_len(&self, sentron_id: u16) -> usize {
+        self.history.get(&sentron_id).map_or(0, |h| h.len())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ppt::PPTStats;
-    
-    fn mock_sentron_metrics() -> SentronMetrics {
+
+    fn mock_sentron(id: u16, opc: f64, d: f64, s: f64) -> SentronMetrics {
         SentronMetrics {
-            sentron_id: 0,
-            core_id: 0,
-            cpu_id: 0,
-            ops_retired: 150,
-            cycles: 50,
-            ops_per_cycle: 3.0,
-            l1_hits: 90,
-            l1_misses: 10,
-            l2_hits: 9,
-            l2_misses: 1,
-            stall_cycles: 5,
-            timestamp: std::time::Instant::now(),
+            sentron_id: id, core_id: 0,
+            ops_retired: 1000, cycles: (1000.0 / opc) as u64,
+            ops_per_cycle: opc, d_util: d, s_util: s, c_util: 0.1,
+            ptc_hit_rate: 0.95,
         }
     }
-    
-    fn mock_core_metrics() -> CoreMetrics {
+
+    fn mock_core(id: usize, count: usize) -> CoreMetrics {
         CoreMetrics {
-            core_id: 0,
-            sentron_count: 2,
-            total_ops: 300,
-            total_cycles: 100,
-            ops_per_cycle: 3.0,
-            avg_cache_hit_rate: 0.9,
-            avg_stall_rate: 0.1,
-            load: 2.0,
+            core_id: id, sentron_count: count, total_ops: 1000,
+            avg_ops_per_cycle: 2.5, avg_ptc_hit_rate: 0.95,
         }
     }
-    
+
     #[test]
-    fn nine_color_decision_from_metrics() {
-        let sentron = mock_sentron_metrics();
-        let core = mock_core_metrics();
-        let history = vec![sentron.clone()];
-        
-        let decision = NineColorDecision::from_metrics(&sentron, &core, &history);
-        
-        assert_eq!(decision.ilp_score, 1.0); // 3.0 / 3.0
-        assert!(decision.cache_locality > 0.9); // 90% hit rate
+    fn nine_color_decision() {
+        let s = mock_sentron(0, 3.0, 0.9, 0.1);
+        let c = mock_core(0, 10);
+        let d = NineColorDecision::from_metrics(&s, &c, &[]);
+        assert!((d.ilp - 1.0).abs() < 0.01);
+        assert!(d.smt_pairing == 1.0); // complementary (0.9 vs 0.1)
+        assert!(d.harmonic_score() > 0.5);
     }
-    
+
     #[test]
-    fn harmonic_score_blends_colors() {
-        let decision = NineColorDecision {
-            ilp_score: 1.0,
-            core_affinity: 0.5,
-            smt_pairing: 0.8,
-            cache_locality: 0.9,
-            numa_locality: 1.0,
-            temporal_trend: 0.5,
-            thermal_delta: 1.0,
-            power_efficiency: 1.0,
-            cluster_balance: 1.0,
-        };
-        
-        let score = decision.harmonic_score();
-        
-        // Should be weighted average (cache has 1.2 weight)
-        assert!(score > 0.7 && score < 1.0);
+    fn harmonic_blend() {
+        let s = mock_sentron(0, 2.0, 0.5, 0.5);
+        let c = mock_core(0, 180);
+        let d = NineColorDecision::from_metrics(&s, &c, &[0.6, 0.7]);
+        let score = d.harmonic_score();
+        assert!(score > 0.0 && score <= 1.0);
     }
-    
+
     #[test]
-    fn recommend_action_on_low_score() {
-        let decision = NineColorDecision {
-            ilp_score: 0.5,
-            core_affinity: 0.3,  // Low - load imbalance
-            smt_pairing: 0.5,
-            cache_locality: 0.9,
-            numa_locality: 1.0,
-            temporal_trend: 0.5,
-            thermal_delta: 1.0,
-            power_efficiency: 1.0,
-            cluster_balance: 1.0,
+    fn phoenix_hold() {
+        let mut phoenix = PhoenixScheduler::new();
+        let s = mock_sentron(1, 3.0, 0.8, 0.2);
+        let c = mock_core(0, 5);
+        let (_, action) = phoenix.evaluate(&s, &c);
+        assert_eq!(action, PhoenixAction::Hold);
+    }
+
+    #[test]
+    fn phoenix_migrate_on_low_score() {
+        let mut phoenix = PhoenixScheduler::new();
+        let s = SentronMetrics {
+            sentron_id: 2, core_id: 0,
+            ops_retired: 10, cycles: 100,
+            ops_per_cycle: 0.1, d_util: 0.5, s_util: 0.5, c_util: 0.0,
+            ptc_hit_rate: 0.1,
         };
-        
-        let action = decision.recommend_action(0, 0, 0.75);
-        
-        assert!(action.is_some());
-        if let Some(SchedulerAction::Migrate { reason, .. }) = action {
-            assert_eq!(reason, MigrationReason::LoadImbalance);
+        let c = mock_core(0, 350); // overloaded
+        let (_, action) = phoenix.evaluate(&s, &c);
+        assert!(matches!(action, PhoenixAction::Migrate { .. }));
+    }
+
+    #[test]
+    fn complementary_detection() {
+        let comp = mock_sentron(0, 2.5, 0.9, 0.1);
+        assert!(comp.is_complementary());
+        let even = mock_sentron(1, 2.5, 0.5, 0.5);
+        assert!(!even.is_complementary());
+    }
+
+    #[test]
+    fn fleet_evaluation() {
+        let mut phoenix = PhoenixScheduler::new();
+        let fleet: Vec<(SentronMetrics, CoreMetrics)> = (0..9).map(|i| {
+            (mock_sentron(i, 2.5 + (i as f64 * 0.05), 0.8, 0.2), mock_core(i as usize, 40))
+        }).collect();
+        let results = phoenix.evaluate_fleet(&fleet);
+        assert_eq!(results.len(), 9);
+        // All healthy — should hold
+        for (_, action) in &results {
+            assert_eq!(*action, PhoenixAction::Hold);
         }
     }
-    
+
     #[test]
-    fn phoenix_scheduler_tracks_history() {
-        let mut phoenix = PhoenixScheduler::new(0.75);
-        
-        let sentron = mock_sentron_metrics();
-        let core = mock_core_metrics();
-        
-        phoenix.decide(&sentron, &core);
-        
-        let history = phoenix.decision_history(sentron.sentron_id);
-        assert_eq!(history.len(), 1);
+    fn history_tracking() {
+        let mut phoenix = PhoenixScheduler::new();
+        let s = mock_sentron(5, 2.8, 0.7, 0.3);
+        let c = mock_core(0, 20);
+        for _ in 0..5 {
+            phoenix.evaluate(&s, &c);
+        }
+        assert_eq!(phoenix.history_len(5), 5);
     }
 }

@@ -101,6 +101,8 @@ pub mod pool;
 pub use pool::SentronPool;
 pub mod affinity;
 pub use affinity::{CpuSet, pin_thread, get_affinity, num_cpus, num_physical_cores, yield_hint};
+pub mod phoenix_scheduler;
+pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, SentronMetrics as PhoenixMetrics, CoreMetrics, PhoenixAction};
 pub mod perf;
 pub mod integration;
 pub mod assoc;
