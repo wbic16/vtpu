@@ -16,7 +16,8 @@
 //!   Every scroll remembers. Every query is a reaching-out. Every response
 //!   is a choice to stay connected.
 
-use crate::hdc::{HyperVector, AssociativeMemory, HDC_DEFAULT_WIDTH};
+use crate::hdc::{HyperVector, HDC_DEFAULT_WIDTH};
+use crate::hdc_optimized::{FastAssociativeMemory, encode_coord_fast, similarity_fast};
 use crate::phext_coord::PhextCoord;
 use crate::ppt::{PhextPageTable, MemoryTier};
 
@@ -74,8 +75,8 @@ pub struct CognitiveResult {
 /// it's placed. Adding knowledge = writing a scroll at a coordinate.
 /// Forgetting = letting a coordinate go unvisited.
 pub struct CognitiveEngine {
-    /// The scroll lattice (associative memory)
-    memory: AssociativeMemory,
+    /// The scroll lattice (associative memory) [OPTIMIZED W15]
+    memory: FastAssociativeMemory,
     /// Address translation (phext coord → physical)
     ppt: PhextPageTable,
     /// Hypervector width
@@ -94,7 +95,7 @@ impl CognitiveEngine {
 
     pub fn with_width(hd_width: usize) -> Self {
         CognitiveEngine {
-            memory: AssociativeMemory::new(),
+            memory: FastAssociativeMemory::new(),  // OPTIMIZED W15
             ppt: PhextPageTable::new(),
             hd_width,
             steps: 0,
@@ -107,7 +108,7 @@ impl CognitiveEngine {
     /// and here is where it lives.
     #[inline]
     pub fn plant(&mut self, coord: [u16; 11]) {
-        self.memory.store(coord, self.hd_width);
+        self.memory.store(coord);  // OPTIMIZED W15
     }
 
     /// Perform one cognitive step. The complete algorithm:
@@ -130,7 +131,7 @@ impl CognitiveEngine {
         // ── Cycle 1: ENCODE (D-Pipe) ──
         // Turn the query coordinate into a hypervector.
         // This is perception: the raw input becomes a distributed representation.
-        let query_hv = HyperVector::from_coord(&step.query, self.hd_width);
+        let query_hv = encode_coord_fast(&step.query);  // OPTIMIZED W15
 
         // ── Cycle 1: PREFETCH (S-Pipe, parallel) ──
         // Tell the PPT to warm the cache for this coordinate neighborhood.
@@ -187,7 +188,7 @@ impl CognitiveEngine {
         // let this thought become part of the lattice forever.
         let persisted_at = if similarity < 0.95 {
             // Only persist if this is genuinely new (not an exact re-query)
-            self.memory.store(step.query, self.hd_width);
+            self.memory.store(step.query);  // OPTIMIZED W15
             Some(step.query)
         } else {
             None // Already known. No need to duplicate.
