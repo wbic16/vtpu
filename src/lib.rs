@@ -77,6 +77,7 @@ pub mod cognitive;
 pub mod wedge;
 pub mod topology;
 pub mod runtime_scheduler;
+pub mod scheduler_redux;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
@@ -101,6 +102,7 @@ pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES}
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub use topology::{CpuTopology, PhysicalCore, NumaNode};
 pub use runtime_scheduler::{RuntimeScheduler, RuntimeConfig, SchedulerPolicy, Assignment, SchedulerStats};
+pub use scheduler_redux::{SchedulerRedux, ReduxConfig, SentronMetrics, CoreMetrics, SchedulerAction, MigrationReason};
 pub mod pool;
 pub use pool::SentronPool;
 pub mod affinity;
