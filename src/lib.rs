@@ -102,9 +102,8 @@ pub use pool::SentronPool;
 pub mod affinity;
 pub use affinity::{CpuSet, pin_thread, get_affinity, num_cpus, num_physical_cores, yield_hint};
 pub mod phoenix_scheduler;
-pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, SentronMetrics, CoreMetrics, SchedulerAction, MigrationReason, NineColorStats};
+pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, SentronMetrics as PhoenixMetrics, CoreMetrics,  SchedulerAction, MigrationReason};
 pub mod perf;
-#[cfg(test)]
 pub mod integration;
 pub mod assoc;
 pub mod cpu_sched;
