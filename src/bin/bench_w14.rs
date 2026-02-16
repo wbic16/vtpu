@@ -25,7 +25,34 @@ fn main() {
     bench_ppt_translation();
     bench_ternary_inference();
 
+    bench_pool_lifecycle();
+
     println!("\n═══════════════════════════════════════════════");
+}
+
+fn bench_pool_lifecycle() {
+    let iterations = 100_000;
+    let mut pool = SentronPool::new(1, 8);
+    let mut mem = Memory::new(); // shared memory — no reallocation
+    let program = [SIW::new(
+        DenseOp::DMUL { rd: 2, rs1: 0, rs2: 1 },
+        SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+    )];
+
+    let start = Instant::now();
+    for _ in 0..iterations {
+        let idx = pool.checkout().unwrap();
+        pool.load_program(idx, &program);
+        pool.get_mut(idx).regs.general[0] = 7;
+        pool.get_mut(idx).regs.general[1] = 6;
+        let _ = exec::run(pool.get_mut(idx), &mut mem);
+        pool.checkin(idx);
+    }
+    let elapsed = start.elapsed();
+    let ops_sec = iterations as f64 / elapsed.as_secs_f64();
+
+    println!("  Pool+Mem:   {:>10} checkout→run→checkin {:>5.2} ms  ({:.0} sentrons/sec)",
+        iterations, elapsed.as_secs_f64() * 1000.0, ops_sec);
 }
 
 fn bench_packer_throughput() {
