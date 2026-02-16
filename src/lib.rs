@@ -56,6 +56,7 @@ pub mod cosmology;
 pub mod packer;
 pub mod regalloc;
 pub mod scheduler;
+pub use scheduler::{Scheduler, ScheduleResult, SchedulerRedux, SchedulerFeedback};
 pub mod stream;
 pub mod display;
 pub mod validation;
@@ -75,17 +76,12 @@ pub mod harmonic;
 pub mod harmonics;
 pub mod cognitive;
 pub mod wedge;
-pub mod topology;
-pub mod runtime_scheduler;
-pub mod scheduler_redux;
-pub mod phoenix_scheduler;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
 pub use hdc::{HyperVector, AssociativeMemory, HDC_DEFAULT_WIDTH};
 pub use phext_coord::PhextCoord;
 pub use telemetry::VtpuTelemetry;
-// pub use scheduler::Scheduler;  // W17: Replaced with OS scheduler integration (CpuTopology)
 pub use stream::StreamBuilder;
 pub use validation::{validate_stream, ValidationError};
 pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
@@ -101,15 +97,6 @@ pub use c_pipe::{CPipeExecutor, Message, SentronId, CPipeError};
 pub use synchronicity::{WuXing, Bagua, SentronMote, ShellOfNine, TOTAL_MOTES, NODES, MOTES_PER_NODE};
 pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES};
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
-pub use topology::{CpuTopology, PhysicalCore, NumaNode};
-pub use runtime_scheduler::{RuntimeScheduler, RuntimeConfig, SchedulerPolicy, Assignment, SchedulerStats};
-pub use scheduler_redux::{SchedulerRedux, ReduxConfig, SentronMetrics, CoreMetrics, SchedulerAction, MigrationReason};
-pub use scheduler::{
-    WorkloadClass, WorkloadStats, CoopResult, 
-    SchedulerFeedback, AdaptiveScheduler, AdaptivePolicy
-};
-pub use scheduler::cooperative::{execute_cooperative, execute_pair_cooperative, execute_adaptive};
-pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, NineColorStats};
 pub mod pool;
 pub use pool::SentronPool;
 pub mod affinity;
