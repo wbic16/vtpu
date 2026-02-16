@@ -386,3 +386,81 @@ mod more_tests {
         assert!(sassoc_sroute_through_executor());
     }
 }
+
+#[cfg(test)]
+mod w15_tests {
+    use super::*;
+
+    #[test]
+    fn e2e_hdc_bind_is_xor() {
+        let mut sentron = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        sentron.regs.general[1] = 0xFF00FF00_i64;
+        sentron.regs.general[2] = 0x0F0F0F0F_i64;
+        sentron.spawn(vec![SIW::new(
+            DenseOp::DHDBIND { rd: 3, rs1: 1, rs2: 2 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        )]);
+        exec::run_standalone(&mut sentron);
+        assert_eq!(sentron.regs.general[3], 0xFF00FF00_i64 ^ 0x0F0F0F0F_i64);
+    }
+
+    #[test]
+    fn e2e_hdc_bind_self_inverse() {
+        let mut sentron = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        sentron.regs.general[1] = 42;
+        sentron.regs.general[2] = 99;
+        // bind(a, b) then bind(result, b) should give back a
+        sentron.spawn(vec![
+            SIW::new(DenseOp::DHDBIND { rd: 3, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DHDBIND { rd: 4, rs1: 3, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+        ]);
+        exec::run_standalone(&mut sentron);
+        assert_eq!(sentron.regs.general[4], 42, "XOR bind should be self-inverse");
+    }
+
+    #[test]
+    fn e2e_hdc_permute_rotates() {
+        let mut sentron = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        sentron.regs.general[1] = 1_i64; // single bit set
+        sentron.spawn(vec![SIW::new(
+            DenseOp::DHDPERM { rd: 2, rs: 1, k: 8 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        )]);
+        exec::run_standalone(&mut sentron);
+        assert_eq!(sentron.regs.general[2], 256, "Rotate left by 8 should shift bit 0 to bit 8");
+    }
+
+    #[test]
+    fn e2e_hdc_encode_deterministic() {
+        let mut s1 = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        let mut s2 = Sentron::new(1, PhextCoord::zero(), 0, 1);
+        s1.regs.general[1] = 777;
+        s2.regs.general[1] = 777;
+        let prog = vec![SIW::new(
+            DenseOp::DHDENC { rd: 2, rs: 1, width: 1024 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        )];
+        s1.spawn(prog.clone());
+        s2.spawn(prog);
+        exec::run_standalone(&mut s1);
+        exec::run_standalone(&mut s2);
+        assert_eq!(s1.regs.general[2], s2.regs.general[2], "Same input → same encoding");
+        assert_ne!(s1.regs.general[2], 0, "Encoding should be non-zero");
+    }
+
+    #[test]
+    fn e2e_crecv_from_inbox() {
+        let mut mem = Memory::new();
+        let mut sentron = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        sentron.inbox.push((1, 42));  // message from sentron 1
+        sentron.inbox.push((2, 99));  // message from sentron 2
+        sentron.spawn(vec![
+            SIW::new(DenseOp::DNOP, SparseOp::SNOP, CoordOp::CRECV { rd: 1, src_sentron: 0 }, PhextCoord::zero()),
+            SIW::new(DenseOp::DNOP, SparseOp::SNOP, CoordOp::CRECV { rd: 2, src_sentron: 0 }, PhextCoord::zero()),
+        ]);
+        exec::run(&mut sentron, &mut mem);
+        // LIFO: last pushed = first popped
+        assert_eq!(sentron.regs.general[1], 99);
+        assert_eq!(sentron.regs.general[2], 42);
+    }
+}

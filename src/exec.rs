@@ -138,11 +138,37 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
             sentron.regs.general[rd as usize] = imm;
             active += 1;
         }
-        DenseOp::DHDENC { rd, rs, .. } |
-        DenseOp::DHDBIND { rd, rs1: rs, .. } |
-        DenseOp::DHDBUND { rd, rs1: rs, .. } |
-        DenseOp::DHDPERM { rd, rs, .. } => {
-            sentron.regs.general[rd as usize] = sentron.regs.general[rs as usize];
+        DenseOp::DHDENC { rd, rs, width } => {
+            // Encode: hash the value into a pseudo-random hypervector word
+            // Uses a simple but deterministic bit-mixing function
+            let val = sentron.regs.general[rs as usize] as u64;
+            let w = width as u64 | 1; // ensure odd for mixing
+            let mixed = val.wrapping_mul(0x9E3779B97F4A7C15) // golden ratio hash
+                .wrapping_add(w.wrapping_mul(0x517CC1B727220A95))
+                .rotate_left(32);
+            sentron.regs.general[rd as usize] = mixed as i64;
+            active += 1;
+        }
+        DenseOp::DHDBIND { rd, rs1, rs2 } => {
+            // Bind: XOR (the fundamental HDC binding operation)
+            let a = sentron.regs.general[rs1 as usize];
+            let b = sentron.regs.general[rs2 as usize];
+            sentron.regs.general[rd as usize] = a ^ b;
+            active += 1;
+        }
+        DenseOp::DHDBUND { rd, rs1, rs2 } => {
+            // Bundle: majority vote on bits (approximated as OR for 2 inputs)
+            // True bundling needs 3+ inputs; for 2, OR preserves set bits
+            let a = sentron.regs.general[rs1 as usize];
+            let b = sentron.regs.general[rs2 as usize];
+            sentron.regs.general[rd as usize] = a | b;
+            active += 1;
+        }
+        DenseOp::DHDPERM { rd, rs, k } => {
+            // Permute: rotate bits by k positions (sequence encoding)
+            let val = sentron.regs.general[rs as usize] as u64;
+            let rotated = val.rotate_left(k as u32);
+            sentron.regs.general[rd as usize] = rotated as i64;
             active += 1;
         }
         DenseOp::DHDSIM { rd, rs1, rs2 } => {
@@ -250,7 +276,11 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
         CoordOp::CROUTE { .. } => { active += 1; }
         CoordOp::CSEND { .. } => { active += 1; }
         CoordOp::CRECV { rd, .. } => {
-            sentron.regs.general[rd as usize] = 0;
+            // Pop from inbox if available, otherwise 0
+            sentron.regs.general[rd as usize] = match sentron.inbox.pop() {
+                Some((_sender, value)) => value,
+                None => 0,
+            };
             active += 1;
         }
         CoordOp::CBAR { .. } => { active += 1; }

@@ -63,6 +63,8 @@ pub struct Sentron {
     pub cycles: u64,
     pub retired: u64,
     pub assoc: AssocState,
+    /// Inbound message queue (from other sentrons via CSEND)
+    pub inbox: Vec<(u16, i64)>,  // (sender_id, value)
 }
 
 impl Sentron {
@@ -79,6 +81,7 @@ impl Sentron {
             cycles: 0,
             retired: 0,
             assoc: AssocState::new(),
+            inbox: Vec::new(),
         }
     }
 
