@@ -5,6 +5,7 @@
 
 use crate::phext_coord::PhextCoord;
 use crate::siw::SIW;
+use crate::assoc::AssocState;
 
 /// Sentron lifecycle states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +62,7 @@ pub struct Sentron {
     pub program: Vec<SIW>,
     pub cycles: u64,
     pub retired: u64,
+    pub assoc: AssocState,
 }
 
 impl Sentron {
@@ -76,6 +78,7 @@ impl Sentron {
             program: Vec::new(),
             cycles: 0,
             retired: 0,
+            assoc: AssocState::new(),
         }
     }
 

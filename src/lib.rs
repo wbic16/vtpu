@@ -98,3 +98,4 @@ pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES}
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub mod perf;
 pub mod integration;
+pub mod assoc;

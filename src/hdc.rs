@@ -109,6 +109,7 @@ impl HyperVector {
 }
 
 /// Associative memory: hypervector → coordinate mappings.
+#[derive(Debug, Clone)]
 pub struct AssociativeMemory {
     entries: Vec<(HyperVector, [u16; 11])>,
 }

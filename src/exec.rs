@@ -209,8 +209,29 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
             active += 1;
         }
         SparseOp::SFREE { .. } => { active += 1; }
-        SparseOp::SASSOC { rd, .. } | SparseOp::SROUTE { rd, .. } | SparseOp::SNEIGHBR { rd, .. } => {
-            sentron.regs.general[rd as usize] = 0;
+        SparseOp::SASSOC { rd, .. } => {
+            // Store the coordinate from phext register 0 into associative memory
+            let coord = sentron.regs.phext[0];
+            let idx = sentron.assoc.store(&coord);
+            sentron.regs.general[rd as usize] = idx as i64;
+            active += 1;
+        }
+        SparseOp::SROUTE { rd, .. } => {
+            // Query nearest match for coordinate in phext register 0
+            let coord = sentron.regs.phext[0];
+            let (sim, hash) = sentron.assoc.route(&coord);
+            sentron.regs.general[rd as usize] = sim; // similarity in rd
+            if (rd as usize) + 1 < 16 {
+                sentron.regs.general[rd as usize + 1] = hash; // hash in rd+1
+            }
+            active += 1;
+        }
+        SparseOp::SNEIGHBR { rd, .. } => {
+            // Count neighbors above threshold (threshold from r1 as fixed-point /1000)
+            let coord = sentron.regs.phext[0];
+            let threshold = sentron.regs.general[1] as f64 / 1000.0;
+            let count = sentron.assoc.neighbors(&coord, threshold);
+            sentron.regs.general[rd as usize] = count;
             active += 1;
         }
     }
