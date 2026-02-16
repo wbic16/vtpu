@@ -80,7 +80,13 @@ impl CPipeExecutor {
             
             CoordOp::CNOP => Ok(()),
             
-            _ => Ok(()), // Other C-Pipe ops (CROUTE, CREDUCE, CCAST, etc.) TODO
+            // Future C-Pipe operations (to be implemented):
+            // - CROUTE: Coordinate-based routing decisions
+            // - CREDUCE: Cross-coordinate reduction operations
+            // - CCAST: Broadcast to multiple sentrons
+            // - CFENCE: Memory fence for coordination
+            // Placeholder: return Ok for undefined ops (fail-open for forward compatibility)
+            _ => Ok(())
         }
     }
     
