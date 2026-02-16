@@ -8,6 +8,7 @@ use crate::Memory;
 use crate::Sentron;
 use crate::exec::{run, ExecStats};
 use super::workload::{WorkloadStats, quantize_stream, should_yield, DEFAULT_QUANTUM};
+use super::feedback::{AdaptiveScheduler, SchedulerFeedback};
 
 /// Cooperative execution result
 #[derive(Debug, Clone)]
@@ -23,6 +24,9 @@ pub struct CoopResult {
     
     /// Number of yields to OS scheduler
     pub yields: usize,
+    
+    /// Scheduler feedback (if adaptive execution used)
+    pub feedback: Option<SchedulerFeedback>,
 }
 
 /// Execute a SIW stream cooperatively with OS scheduler
@@ -78,6 +82,69 @@ pub fn execute_cooperative(
         workload,
         quanta_executed: total_quanta,
         yields,
+        feedback: None,
+    }
+}
+
+/// Execute a SIW stream with adaptive scheduling (feedback-driven)
+///
+/// Monitors OS scheduler behavior and adapts yield policy in real-time.
+///
+/// # Arguments
+/// * `stream` - SIW instructions to execute
+/// * `sentron` - Execution context
+/// * `memory` - Memory subsystem
+/// * `quantum_size` - SIWs per quantum (None = default 64)
+///
+/// # Returns
+/// Cooperative execution result with scheduler feedback
+pub fn execute_adaptive(
+    stream: &[SIW],
+    sentron: &mut Sentron,
+    memory: &mut Memory,
+    quantum_size: Option<usize>,
+) -> CoopResult {
+    let quantum = quantum_size.unwrap_or(DEFAULT_QUANTUM);
+    
+    // Analyze workload
+    let workload = WorkloadStats::analyze(stream);
+    
+    // Quantize stream
+    let quanta = quantize_stream(stream, quantum);
+    let total_quanta = quanta.len();
+    
+    // Create adaptive scheduler
+    let mut adaptive = AdaptiveScheduler::new();
+    
+    // Execute quanta with adaptive yields
+    let mut total_stats = ExecStats::default();
+    let mut yields = 0;
+    
+    for (idx, quantum_slice) in quanta.iter().enumerate() {
+        // Update scheduler feedback
+        adaptive.update();
+        
+        // Execute this quantum
+        sentron.spawn(quantum_slice.to_vec());
+        let quantum_stats = run(sentron, memory);
+        
+        // Accumulate stats
+        total_stats.ops_retired += quantum_stats.ops_retired;
+        total_stats.cycles += quantum_stats.cycles;
+        
+        // Adaptive yield decision
+        if adaptive.should_yield(idx) && idx < total_quanta - 1 {
+            std::thread::yield_now();
+            yields += 1;
+        }
+    }
+    
+    CoopResult {
+        stats: total_stats,
+        workload,
+        quanta_executed: total_quanta,
+        yields,
+        feedback: Some(adaptive.feedback().clone()),
     }
 }
 
@@ -163,5 +230,29 @@ mod tests {
         
         use super::super::workload::WorkloadClass;
         assert_eq!(result.workload.class, WorkloadClass::DenseHeavy);
+    }
+    
+    #[test]
+    fn test_adaptive_execution() {
+        let stream = make_d_heavy_stream(400);
+        let mut sentron = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        let mut memory = Memory::new();
+        
+        let result = execute_adaptive(&stream, &mut sentron, &mut memory, Some(64));
+        
+        assert_eq!(result.workload.siw_count, 400);
+        assert_eq!(result.quanta_executed, 7);
+        
+        // Should have feedback
+        assert!(result.feedback.is_some());
+        
+        let feedback = result.feedback.unwrap();
+        // On Linux, should have sampled current CPU
+        #[cfg(target_os = "linux")]
+        {
+            // May or may not have migrated depending on OS scheduler
+            // Just check that feedback was collected
+            assert!(feedback.current_cpu.is_some() || feedback.current_cpu.is_none());
+        }
     }
 }

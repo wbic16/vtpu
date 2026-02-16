@@ -4,13 +4,16 @@
 //! Provides CPU topology discovery, thread affinity, and NUMA awareness.
 //!
 //! R23W17-2: Cooperative scheduling with workload classification and quantized execution.
+//! Redux: Real-time scheduler feedback loop - OS behavior feeds back into vTPU decisions.
 
 pub mod workload;
 pub mod cooperative;
+pub mod feedback;
 
 use std::collections::HashMap;
 pub use workload::{WorkloadClass, WorkloadStats, quantize_stream, should_yield, DEFAULT_QUANTUM};
 pub use cooperative::{execute_cooperative, execute_pair_cooperative, CoopResult};
+pub use feedback::{SchedulerFeedback, AdaptiveScheduler, AdaptivePolicy, read_context_switches};
 
 /// CPU topology information
 #[derive(Debug, Clone)]
