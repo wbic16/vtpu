@@ -12,6 +12,7 @@
 use vtpu_runtime::{
     cognitive::{CognitiveEngine, CognitiveStep},
     AssociativeMemory, HyperVector, HDC_DEFAULT_WIDTH,
+    hdc_optimized::{FastAssociativeMemory, encode_coord_fast},
     Memory, PhextCoord,
 };
 use std::time::Instant;
@@ -135,26 +136,28 @@ fn bench_cognitive_loop() -> BenchmarkResult {
 }
 
 fn bench_hdc_operations() -> BenchmarkResult {
+    use vtpu_runtime::hdc_optimized::similarity_fast;
+    
     let coord1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
     let coord2 = [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
     
     // Warmup
     for _ in 0..10 {
-        let hv1 = HyperVector::from_coord(&coord1, HDC_DEFAULT_WIDTH);
-        let hv2 = HyperVector::from_coord(&coord2, HDC_DEFAULT_WIDTH);
+        let hv1 = encode_coord_fast(&coord1);  // OPTIMIZED
+        let hv2 = encode_coord_fast(&coord2);  // OPTIMIZED
         let _bound = hv1.bind(&hv2);
-        let _sim = hv1.similarity(&hv2);
+        let _sim = similarity_fast(&hv1, &hv2);  // OPTIMIZED
     }
     
-    // Benchmark: Encode + Bundle + Similarity
+    // Benchmark: Encode + Bind + Similarity
     let iterations = 10000;
     let start = Instant::now();
     
     for _ in 0..iterations {
-        let hv1 = HyperVector::from_coord(&coord1, HDC_DEFAULT_WIDTH);
-        let hv2 = HyperVector::from_coord(&coord2, HDC_DEFAULT_WIDTH);
+        let hv1 = encode_coord_fast(&coord1);  // OPTIMIZED
+        let hv2 = encode_coord_fast(&coord2);  // OPTIMIZED
         let _bound = hv1.bind(&hv2);
-        let _sim = hv1.similarity(&hv2);
+        let _sim = similarity_fast(&hv1, &hv2);  // OPTIMIZED
     }
     
     let elapsed = start.elapsed();
@@ -163,7 +166,7 @@ fn bench_hdc_operations() -> BenchmarkResult {
     let ops_per_iteration = 4;
     
     let result = BenchmarkResult::new(
-        "HDC (encode + bind + similarity)",
+        "HDC (encode + bind + similarity) [OPTIMIZED]",
         iterations,
         elapsed.as_nanos() as u64,
         ops_per_iteration,
@@ -218,7 +221,7 @@ fn bench_memory_operations() -> BenchmarkResult {
 }
 
 fn bench_real_inference() -> BenchmarkResult {
-    let mut memory = AssociativeMemory::new();
+    let mut memory = FastAssociativeMemory::new();  // OPTIMIZED
     
     // Train on phrases
     let training_data = vec![
@@ -234,12 +237,12 @@ fn bench_real_inference() -> BenchmarkResult {
     
     for (prefix, next) in &training_data {
         let pattern = encode_phrase_pattern(prefix, next);
-        memory.store(pattern, HDC_DEFAULT_WIDTH);
+        memory.store(pattern);  // OPTIMIZED - no width param
     }
     
     // Warmup
     let query_pattern = encode_query_pattern("how are");
-    let query_hv = HyperVector::from_coord(&query_pattern, HDC_DEFAULT_WIDTH);
+    let query_hv = encode_coord_fast(&query_pattern);  // OPTIMIZED
     for _ in 0..10 {
         memory.query_nearest(&query_hv);
     }
@@ -258,7 +261,7 @@ fn bench_real_inference() -> BenchmarkResult {
     let ops_per_iteration = 9;
     
     let result = BenchmarkResult::new(
-        "Autocomplete Inference (8 patterns)",
+        "Autocomplete Inference (8 patterns) [OPTIMIZED]",
         iterations,
         elapsed.as_nanos() as u64,
         ops_per_iteration,
