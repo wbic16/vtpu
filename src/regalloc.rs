@@ -7,6 +7,7 @@
 
 use crate::pipes::{DenseOp, SparseOp, CoordOp};
 use crate::siw::SIW;
+#[cfg(test)]
 use crate::PhextCoord;
 
 // ── Hazard Detection ──────────────────────────────────────────────

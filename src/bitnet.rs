@@ -10,9 +10,12 @@
 //!   For each row i, col j: output[i][j] = sum_k(activation[i][k] * weight[k][j])
 //!   Where weight ∈ {-1, 0, 1}, so multiply = negate/zero/identity.
 
-use crate::pipes::{DenseOp, SparseOp, CoordOp};
-use crate::siw::SIW;
+use crate::pipes::DenseOp;
+#[cfg(test)]
+use crate::pipes::{SparseOp, CoordOp};
+#[cfg(test)]
 use crate::PhextCoord;
+use crate::siw::SIW;
 use crate::packer::{ScalarOp, pack};
 
 /// Pack a slice of ternary weights {-1, 0, 1} into 2-bit trit format.
@@ -102,6 +105,7 @@ pub fn trit_sparsity(packed: &[i64]) -> f64 {
 mod tests {
     use super::*;
     use crate::sentron::Sentron;
+    #[allow(unused_imports)]
     use crate::memory::Memory;
     use crate::exec;
 

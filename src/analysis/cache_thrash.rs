@@ -139,7 +139,7 @@ impl CacheThrashDetector {
     }
 
     /// Classify the access pattern
-    fn classify_pattern(&self, siws: &[SIW], working_set_size: usize) -> AccessPattern {
+    fn classify_pattern(&self, siws: &[SIW], _working_set_size: usize) -> AccessPattern {
         if siws.len() < 10 {
             return AccessPattern::Tiled; // Too small to classify
         }

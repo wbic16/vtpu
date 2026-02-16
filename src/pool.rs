@@ -131,7 +131,7 @@ mod tests {
         pool.get_mut(idx).regs.general[0] = 7;
         pool.get_mut(idx).regs.general[1] = 6;
 
-        let stats = exec::run_standalone(pool.get_mut(idx));
+        let _stats = exec::run_standalone(pool.get_mut(idx));
         assert_eq!(pool.get(idx).regs.general[2], 42);
 
         pool.checkin(idx);

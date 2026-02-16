@@ -12,7 +12,7 @@
 use crate::pipes::{DenseOp, SparseOp, CoordOp};
 use crate::siw::SIW;
 use crate::PhextCoord;
-use crate::regalloc::{self, Hazard, RegAccess, RegClass};
+use crate::regalloc::{self, RegAccess};
 
 /// A single-pipe operation before packing
 #[derive(Debug, Clone)]

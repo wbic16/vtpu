@@ -5,7 +5,6 @@
 //!
 //! Each test builds a real workload: encode → store → query → route → verify.
 
-use crate::hdc::{HyperVector, AssociativeMemory, HDC_DEFAULT_WIDTH};
 use crate::phext_coord::PhextCoord;
 use crate::memory::Memory;
 use crate::sentron::Sentron;
@@ -14,6 +13,7 @@ use crate::pipes::{DenseOp, SparseOp, CoordOp};
 use crate::exec;
 use crate::packer::{ScalarOp, pack};
 use crate::bitnet;
+use crate::hdc::{HyperVector, AssociativeMemory, HDC_DEFAULT_WIDTH};
 
 // ═══════════════════════════════════════════════════════════════
 // Test 1: End-to-end scroll storage and retrieval

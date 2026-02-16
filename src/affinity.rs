@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn cache_detection() {
-        let (l1, l2, l3) = cache_sizes();
+        let (l1, l2, _l3) = cache_sizes();
         // Zen 4: L1=32K, L2=1024K, L3=16384K
         assert!(l1 > 0, "Should detect L1 cache");
         assert!(l2 > 0, "Should detect L2 cache");

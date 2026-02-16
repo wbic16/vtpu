@@ -275,7 +275,7 @@ unsafe fn syscall5(n: i64, arg1: i64, arg2: i64, arg3: i64, arg4: i64, arg5: i64
 
 // Linux syscall numbers (x86_64)
 const SYS_READ: i64 = 0;
-const SYS_CLOSE: i64 = 3;
+const _SYS_CLOSE: i64 = 3;
 const SYS_IOCTL: i64 = 16;
 const SYS_PERF_EVENT_OPEN: i64 = 298;
 

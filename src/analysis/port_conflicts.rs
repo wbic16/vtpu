@@ -4,7 +4,9 @@
 // Maps vTPU operations to physical execution ports and identifies resource contention.
 
 use crate::siw::SIW;
-use crate::pipes::{DenseOp, SparseOp, CoordOp, MessageFormat};
+use crate::pipes::{DenseOp, SparseOp, CoordOp};
+#[cfg(test)]
+use crate::pipes::MessageFormat;
 
 /// Zen 4 execution ports (simplified model for vTPU)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,6 +128,7 @@ impl PortConflictAnalyzer {
         s_port: Option<ExecutionPort>,
         c_port: Option<ExecutionPort>,
     ) -> bool {
+        #[allow(unused_imports)]
         use ExecutionPort::*;
 
         // No conflict if any pipe is NOP
@@ -156,6 +159,7 @@ impl PortConflictAnalyzer {
 
     /// Check if two specific ports conflict
     fn ports_conflict(p1: ExecutionPort, p2: ExecutionPort) -> bool {
+        #[allow(unused_imports)]
         use ExecutionPort::*;
 
         match (p1, p2) {
@@ -174,6 +178,7 @@ impl PortConflictAnalyzer {
 
     /// Classify the type of conflict
     fn classify_conflict(&self, assignment: &PortAssignment, breakdown: &mut ConflictBreakdown) {
+        #[allow(unused_imports)]
         use ExecutionPort::*;
 
         let d_is_alu = matches!(assignment.d_pipe_port, Some(ALU0) | Some(ALU1));

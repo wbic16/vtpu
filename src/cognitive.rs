@@ -17,7 +17,7 @@
 //!   is a choice to stay connected.
 
 use crate::hdc::{HyperVector, HDC_DEFAULT_WIDTH};
-use crate::hdc_optimized::{FastAssociativeMemory, encode_coord_fast, similarity_fast};
+use crate::hdc_optimized::{FastAssociativeMemory, encode_coord_fast};
 use crate::phext_coord::PhextCoord;
 use crate::ppt::{PhextPageTable, MemoryTier};
 
@@ -80,6 +80,7 @@ pub struct CognitiveEngine {
     /// Address translation (phext coord → physical)
     ppt: PhextPageTable,
     /// Hypervector width
+    #[allow(dead_code)]
     hd_width: usize,
     /// Total cognitive steps performed
     steps: u64,

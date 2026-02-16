@@ -9,7 +9,6 @@
 
 use crate::phext_coord::PhextCoord;
 use crate::siw::SIW;
-use crate::sentron::Sentron;
 use crate::memory::Memory;
 use crate::ppt::PhextPageTable as PPT;
 use std::sync::{Arc, Mutex};
@@ -111,10 +110,10 @@ pub struct WedgeExecutor {
     wedges: Vec<Wedge>,
     
     /// Shared memory (thread-safe)
-    memory: Arc<Mutex<Memory>>,
+    _memory: Arc<Mutex<Memory>>,
     
     /// Shared PPT (thread-safe)
-    ppt: Arc<Mutex<PPT>>,
+    _ppt: Arc<Mutex<PPT>>,
 }
 
 impl WedgeExecutor {
@@ -126,8 +125,8 @@ impl WedgeExecutor {
         
         WedgeExecutor {
             wedges,
-            memory: Arc::new(Mutex::new(Memory::new())),
-            ppt: Arc::new(Mutex::new(PPT::new())),
+            _memory: Arc::new(Mutex::new(Memory::new())),
+            _ppt: Arc::new(Mutex::new(PPT::new())),
         }
     }
     

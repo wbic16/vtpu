@@ -5,6 +5,7 @@
 
 use vtpu_runtime::*;
 use vtpu_runtime::pool::SentronPool;
+#[allow(unused_imports)]
 use vtpu_runtime::affinity::*;
 use std::time::Instant;
 use std::thread;
