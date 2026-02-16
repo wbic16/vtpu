@@ -10,7 +10,7 @@
 //!
 //! Together: End-to-end coordination from source to silicon.
 
-use crate::topology::{CpuTopology, PhysicalCore};
+use crate::scheduler::CpuTopology;
 use crate::sentron::Sentron;
 use crate::smt::SmtPair;
 use crate::phext_coord::PhextCoord;
@@ -304,7 +304,7 @@ impl std::fmt::Display for SchedulerStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::topology::*;
+    use crate::scheduler::CpuTopology;
     
     fn mock_topology_2core_smt() -> CpuTopology {
         CpuTopology {
