@@ -15,7 +15,7 @@ A software-defined accelerator with sentron-native instruction scheduling and ph
 | 3 — Compiler | W29–W35 | ⬜ |
 | 4 — Launch | W36–W40 | ⬜ |
 
-**228 tests. ~10K LOC. Zero deps.**
+**272 tests. ~10K LOC. Zero deps.**
 
 ## Benchmarks (Zen 4 8945HS, release)
 
@@ -92,7 +92,7 @@ The naive sentron lifecycle (4,575/sec) was **17,000x slower** than pooled (72M/
 ```bash
 git clone https://github.com/wbic16/vtpu
 cd vtpu
-cargo test          # 228 tests, all green
+cargo test          # 272 tests, all green
 cargo run --release --bin bench       # Phase 0 gate
 cargo run --release --bin bench_w14   # Full stack benchmarks
 ```
