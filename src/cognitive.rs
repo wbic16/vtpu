@@ -215,6 +215,10 @@ impl CognitiveEngine {
     /// A healthy cognitive engine bonds 60-90% of the time.
     /// Below 40% = the lattice is sparse, needs more scrolls.
     /// Above 95% = the engine is only re-treading known ground.
+    pub fn bond_count(&self) -> u64 {
+        self.bonds
+    }
+
     pub fn bond_rate(&self) -> f64 {
         if self.steps == 0 { return 0.0; }
         self.bonds as f64 / self.steps as f64
