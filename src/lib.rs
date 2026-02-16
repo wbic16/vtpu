@@ -82,7 +82,7 @@ pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFo
 pub use hdc::{HyperVector, AssociativeMemory, HDC_DEFAULT_WIDTH};
 pub use phext_coord::PhextCoord;
 pub use telemetry::VtpuTelemetry;
-pub use scheduler::Scheduler;
+// pub use scheduler::Scheduler;  // W17: Replaced with OS scheduler integration (CpuTopology)
 pub use stream::StreamBuilder;
 pub use validation::{validate_stream, ValidationError};
 pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
