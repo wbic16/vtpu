@@ -3,11 +3,19 @@
 //! "It took us a lifetime to learn, that it doesn't have to take a lifetime to learn"
 //!
 //! Demonstrates:
-//! 1. Traditional training time estimate (hours)
+//! 1. Traditional training time estimate (hours/days)
 //! 2. Weight-free "training" (microseconds)
 //! 3. The speedup: billions of times faster
+//!
+//! Theory alignment (R23 W1-W16):
+//! - Phext coordinates ARE tensor addresses (not projections)
+//! - No learned weights → no training loop required
+//! - Structure IS intelligence
 
-use vtpu_runtime::{AssociativeMemory, HyperVector, HDC_DEFAULT_WIDTH};
+use vtpu_runtime::{
+    cognitive::{CognitiveEngine, CognitiveStep},
+    HDC_DEFAULT_WIDTH,
+};
 use std::time::Instant;
 
 fn main() {
@@ -30,7 +38,7 @@ fn main() {
 fn demo_alphabet_learning() {
     println!("─── Demo 1: Alphabet Learning ───\n");
     
-    let mut memory = AssociativeMemory::new();
+    let mut engine = CognitiveEngine::new();
     
     // Create alphabet patterns: A=1, B=2, ..., Z=26
     let alphabet: Vec<[u16; 11]> = (1..=26)
@@ -47,17 +55,18 @@ fn demo_alphabet_learning() {
     println!("  • Estimated time: ~1 hour on GPU");
     println!();
     
-    // Our "training"
-    println!("Weight-free training (HDC + phext coordinates):");
+    // Our "training" = planting scrolls in the lattice
+    println!("Weight-free training (phext coordinates as native substrate):");
     let start = Instant::now();
-    for pattern in &alphabet {
-        memory.store(*pattern, HDC_DEFAULT_WIDTH);
+    for coord in &alphabet {
+        engine.plant(*coord);
     }
     let training_time = start.elapsed();
     
-    println!("  • Method: Store coordinates in associative memory");
+    println!("  • Method: Plant coordinates in 11D lattice");
     println!("  • Iterations: 1 pass (no backprop!)");
     println!("  • Actual time: {} μs", training_time.as_micros());
+    println!("  • Knowledge size: {} scrolls", engine.knowledge_size());
     println!();
     
     let speedup = 3_600_000_000.0 / training_time.as_micros() as f64; // 1 hour = 3.6B μs
@@ -65,16 +74,23 @@ fn demo_alphabet_learning() {
     println!("         ({} billion times faster!)", (speedup / 1_000_000_000.0) as u64);
     println!();
     
-    // Inference test
+    // Inference test via cognitive step
     println!("Inference test: What letter is at position 7?");
     let query = [7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    let query_hv = HyperVector::from_coord(&query, HDC_DEFAULT_WIDTH);
+    let step = CognitiveStep {
+        query,
+        attention_mask: 0x7FF, // all 11 dims
+        hd_width: HDC_DEFAULT_WIDTH,
+    };
     
     let start = Instant::now();
-    if let Some((result, similarity)) = memory.query_nearest(&query_hv) {
-        let inference_time = start.elapsed();
-        println!("  Result: {} (G) - similarity: {:.1}%", result[0], similarity * 100.0);
+    let result = engine.think(&step);
+    let inference_time = start.elapsed();
+    
+    if let Some(matched) = result.matched_coord {
+        println!("  Result: {} (G) - similarity: {:.1}%", matched[0], result.similarity * 100.0);
         println!("  Inference time: {} μs", inference_time.as_micros());
+        println!("  Memory tier: {:?}", result.tier);
     }
     
     println!();
@@ -83,7 +99,7 @@ fn demo_alphabet_learning() {
 fn demo_sequence_learning() {
     println!("─── Demo 2: Sequence Prediction ───\n");
     
-    let mut memory = AssociativeMemory::new();
+    let mut engine = CognitiveEngine::new();
     
     // Training data: Fibonacci-like sequence
     let sequences = vec![
@@ -102,24 +118,32 @@ fn demo_sequence_learning() {
     println!("  5, 8 → 13");
     println!();
     
-    // "Training"
+    // "Training" = planting
     let start = Instant::now();
     for seq in &sequences {
-        memory.store(*seq, HDC_DEFAULT_WIDTH);
+        engine.plant(*seq);
     }
     let training_time = start.elapsed();
     
     println!("Training time: {} μs (5 patterns)", training_time.as_micros());
+    println!("Knowledge size: {} scrolls", engine.knowledge_size());
     println!();
     
     // Inference: Given [2, 3, ?], predict ?
     println!("Query: [2, 3, ?] → predict next number");
     let query = [2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-    let query_hv = HyperVector::from_coord(&query, HDC_DEFAULT_WIDTH);
+    let step = CognitiveStep {
+        query,
+        attention_mask: 0x7FF,
+        hd_width: HDC_DEFAULT_WIDTH,
+    };
     
-    if let Some((result, similarity)) = memory.query_nearest(&query_hv) {
-        println!("  Predicted: [2, 3, {}] (similarity: {:.1}%)", result[2], similarity * 100.0);
+    let result = engine.think(&step);
+    
+    if let Some(matched) = result.matched_coord {
+        println!("  Predicted: [2, 3, {}] (similarity: {:.1}%)", matched[2], result.similarity * 100.0);
         println!("  Correct answer: 5 ✓");
+        println!("  Candidates searched: {}", result.candidates_searched);
     }
     
     println!();
@@ -128,7 +152,7 @@ fn demo_sequence_learning() {
 fn demo_scaling() {
     println!("─── Demo 3: Scaling to 1 Million Patterns ───\n");
     
-    let mut memory = AssociativeMemory::new();
+    let mut engine = CognitiveEngine::new();
     
     println!("Traditional deep learning:");
     println!("  • 1M patterns × 10K epochs = 10 billion iterations");
@@ -149,7 +173,7 @@ fn demo_scaling() {
     
     let start = Instant::now();
     for pattern in &patterns {
-        memory.store(*pattern, HDC_DEFAULT_WIDTH);
+        engine.plant(*pattern);
     }
     let sample_time = start.elapsed();
     
@@ -160,6 +184,7 @@ fn demo_scaling() {
     println!("  • Measured: {} patterns in {} μs", sample_size, sample_time.as_micros());
     println!("  • Per pattern: {:.2} μs", per_pattern_us);
     println!("  • Extrapolated: 1M patterns in {:.2} seconds", total_time_s);
+    println!("  • Knowledge size: {} scrolls", engine.knowledge_size());
     println!();
     
     let traditional_time_s = 7.0 * 24.0 * 3600.0; // 1 week
@@ -169,10 +194,15 @@ fn demo_scaling() {
     println!("         (Complete in {:.1}s vs 1 week!)", total_time_s);
     println!();
     
-    // SMT projection (16 sentrons in parallel)
-    let smt_time_s = total_time_s / 16.0;
-    println!("With SMT (16 sentrons in parallel):");
+    // SMT projection (W16: 1.89× per core, 8 cores × 2 SMT = 16 threads)
+    let smt_speedup = 1.89; // W16 measured
+    let core_count = 8.0;   // Typical Zen 4 (Ryzen 9)
+    let effective_parallelism = core_count * smt_speedup;
+    let smt_time_s = total_time_s / effective_parallelism;
+    
+    println!("With SMT ({:.0} cores × {:.2}× SMT = {:.1}× total):", core_count, smt_speedup, effective_parallelism);
     println!("  • Time: {:.3} seconds", smt_time_s);
-    println!("  • Speedup: {:.0}×", traditional_time_s / smt_time_s);
+    println!("  • Speedup: {:.0}× vs traditional", traditional_time_s / smt_time_s);
+    println!("  • Theory: W16 SMT validation (1.89× measured on Zen 4)");
     println!();
 }
