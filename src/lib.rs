@@ -65,6 +65,7 @@ pub mod sentron;
 pub mod exec;
 pub mod smt;
 pub mod hdc;
+pub mod hdc_optimized;
 pub mod analysis;
 pub mod curves;
 pub mod c_pipe;
