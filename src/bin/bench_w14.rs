@@ -143,21 +143,23 @@ fn bench_hdc_associative_memory() {
 
 fn bench_sentron_spawn_retire() {
     let iterations = 100_000;
+    let mut pool = SentronPool::new(1, 8);
+    let mut mem = Memory::new();
+    let program = [SIW::new(DenseOp::DMUL { rd: 2, rs1: 0, rs2: 1 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero())];
 
     let start = Instant::now();
-    for i in 0..iterations {
-        let mut s = Sentron::new(i as u16, PhextCoord::zero(), 0, 0);
-        s.regs.general[0] = 7;
-        s.regs.general[1] = 6;
-        s.spawn(vec![
-            SIW::new(DenseOp::DMUL { rd: 2, rs1: 0, rs2: 1 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
-        ]);
-        let _ = exec::run_standalone(&mut s);
+    for _ in 0..iterations {
+        let idx = pool.checkout().unwrap();
+        pool.load_program(idx, &program);
+        pool.get_mut(idx).regs.general[0] = 7;
+        pool.get_mut(idx).regs.general[1] = 6;
+        let _ = exec::run(pool.get_mut(idx), &mut mem);
+        pool.checkin(idx);
     }
     let elapsed = start.elapsed();
     let spawns_sec = iterations as f64 / elapsed.as_secs_f64();
 
-    println!("  Lifecycle:  {:>10} spawn→retire in {:>5.2} ms  ({:.0} sentrons/sec)",
+    println!("  Lifecycle:  {:>10} pool spawn→retire {:>5.2} ms  ({:.0} sentrons/sec)",
         iterations, elapsed.as_secs_f64() * 1000.0, spawns_sec);
 }
 
@@ -182,29 +184,34 @@ fn bench_ppt_translation() {
 fn bench_ternary_inference() {
     let iterations = 100_000;
 
-    // 8-element ternary matvec
+    // 8-element ternary matvec — pre-build program once
     let weights: Vec<i8> = vec![1, -1, 0, 1, -1, 0, 1, -1];
     let packed_trits: Vec<i64> = weights.chunks(1).map(|w| bitnet::pack_trits(w)[0]).collect();
 
+    let mut program = vec![
+        SIW::new(DenseOp::DMOV { rd: 15, imm: 0 }, SparseOp::SPREFCH { coord_idx: 0, hint: PrefetchHint::L1 }, CoordOp::CFENCE { scope: FenceScope::Thread }, PhextCoord::zero()),
+    ];
+    for i in 0..8u8 {
+        program.push(SIW::new(
+            DenseOp::DTACC { rd: 15, rs1: i, trit_reg: 8 + i },
+            SparseOp::SPREFCH { coord_idx: (i % 8), hint: PrefetchHint::L2 },
+            CoordOp::CFENCE { scope: FenceScope::Thread },
+            PhextCoord::zero(),
+        ));
+    }
+
+    let mut pool = SentronPool::new(1, 16);
+    let mut mem = Memory::new();
+
     let start = Instant::now();
     for _ in 0..iterations {
-        let mut s = Sentron::new(0, PhextCoord::zero(), 0, 0);
+        let idx = pool.checkout().unwrap();
+        pool.load_program(idx, &program);
+        let s = pool.get_mut(idx);
         for i in 0..8 { s.regs.general[i] = (i as i64 + 1) * 10; }
         for i in 0..8 { s.regs.general[8 + i] = packed_trits[i]; }
-
-        let mut program = vec![
-            SIW::new(DenseOp::DMOV { rd: 15, imm: 0 }, SparseOp::SPREFCH { coord_idx: 0, hint: PrefetchHint::L1 }, CoordOp::CFENCE { scope: FenceScope::Thread }, PhextCoord::zero()),
-        ];
-        for i in 0..8u8 {
-            program.push(SIW::new(
-                DenseOp::DTACC { rd: 15, rs1: i, trit_reg: 8 + i },
-                SparseOp::SPREFCH { coord_idx: (i % 8), hint: PrefetchHint::L2 },
-                CoordOp::CFENCE { scope: FenceScope::Thread },
-                PhextCoord::zero(),
-            ));
-        }
-        s.spawn(program);
-        let _ = exec::run_standalone(&mut s);
+        let _ = exec::run(s, &mut mem);
+        pool.checkin(idx);
     }
     let elapsed = start.elapsed();
     let inf_sec = iterations as f64 / elapsed.as_secs_f64();
