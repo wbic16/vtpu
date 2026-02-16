@@ -78,6 +78,7 @@ pub mod wedge;
 pub mod topology;
 pub mod runtime_scheduler;
 pub mod scheduler_redux;
+pub mod phoenix_scheduler;
 
 pub use siw::SIW;
 pub use pipes::{DenseOp, SparseOp, CoordOp, ReductionOp, PrefetchHint, MessageFormat, FenceScope, MatchMode, MergeOp};
@@ -108,6 +109,7 @@ pub use scheduler::{
     SchedulerFeedback, AdaptiveScheduler, AdaptivePolicy
 };
 pub use scheduler::cooperative::{execute_cooperative, execute_pair_cooperative, execute_adaptive};
+pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, NineColorStats};
 pub mod pool;
 pub use pool::SentronPool;
 pub mod affinity;
