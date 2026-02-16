@@ -108,3 +108,5 @@ pub mod integration;
 pub mod assoc;
 pub mod cpu_sched;
 pub mod redux;
+pub mod phoenix_scheduler;
+pub use phoenix_scheduler::{PhoenixScheduler, NineColorDecision, SchedulerAction, MigrationReason, SentronMetrics, CoreMetrics};
