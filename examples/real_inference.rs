@@ -1,11 +1,28 @@
 //! Real Inference Demo - Push the Envelope
 //!
+//! **Category:** Conceptual (architecture philosophy, not performance benchmark)
+//!
 //! Demonstrates weight-free inference on tasks people recognize as "AI":
 //! 1. Next-word prediction (autocomplete)
 //! 2. Simple Q&A (question → answer retrieval)
 //! 3. Code completion (signature → implementation suggestion)
 //!
 //! No learned weights. No backprop. Just structure.
+//!
+//! **Theory:** Structure IS intelligence (W9 insight)
+//! - Knowledge is placed at coordinates (not trained into weights)
+//! - Inference is navigation of coordinate space
+//! - This example proves the concept works
+//!
+//! **Note:** This is a high-level API demo. For performance measurement:
+//! - W15: Achieved 3.0 ops/cycle via instruction packing
+//! - W16: Achieved 1.89× SMT speedup
+//! - See `src/bin/w15_packed_benchmark.rs` and `src/bin/w16_smt_using_existing.rs`
+//!
+//! **Related waves:**
+//! - W9 (Feb 2026): Proved weight-free inference works (this example)
+//! - W15 (Feb 2026): Optimized to 3.0 ops/cycle (instruction packing)
+//! - W16 (Feb 2026): Achieved 1.89× SMT speedup (parallel execution)
 
 use vtpu_runtime::{AssociativeMemory, HyperVector, PhextCoord, HDC_DEFAULT_WIDTH};
 use std::time::Instant;
