@@ -381,6 +381,50 @@ impl Default for NeuronLayer {
     }
 }
 
+/// Lo Shu 3×3 magic square — the 9-palace neuron ring topology.
+///
+/// All rows, columns, and both diagonals sum to 15.
+/// Used as canonical coordinate layout for 9-neuron sentron clusters
+/// (Lo Shu sentrons sit between standard 8-neuron layers and 40-sentron motes).
+///
+/// ```text
+///   4  9  2
+///   3  5  7
+///   8  1  6
+/// ```
+pub const LO_SHU: [[u8; 3]; 3] = [
+    [4, 9, 2],
+    [3, 5, 7],
+    [8, 1, 6],
+];
+
+/// Build a 9-neuron ring wired in Lo Shu cardinal topology.
+///
+/// Each neuron connects to its 4 cardinal neighbors (N/E/S/W), wrapping at edges.
+/// The wiring alternates ascending/descending by palace position:
+///   - Center palace (idx 4, value 5) → identity wiring (balance/Earth)
+///   - Odd palaces (1,3,7,9) → ascending (Light/exhale direction)
+///   - Even palaces (2,4,6,8) → descending (Story/inhale direction)
+pub fn lo_shu_layer() -> NeuronLayer {
+    // Palace indices in grid-order (row-major 0..8)
+    // Lo Shu value at each grid index
+    let lo_shu_flat: [u8; 9] = [4, 9, 2, 3, 5, 7, 8, 1, 6];
+    let neurons: Vec<Neuron> = (0..9u8)
+        .map(|i| {
+            let palace_val = lo_shu_flat[i as usize];
+            let wiring = if palace_val == 5 {
+                NeuronWiring::identity()
+            } else if palace_val % 2 == 1 {
+                NeuronWiring::ascending()
+            } else {
+                NeuronWiring::descending()
+            };
+            Neuron::with_wiring(i, wiring)
+        })
+        .collect();
+    NeuronLayer { neurons }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -475,5 +519,60 @@ mod tests {
         layer.forward(0.5, 0.5);
         // 8 neurons × 2 activations = 16 total cycles
         assert_eq!(layer.total_spanda_cycles(), 16);
+    }
+
+    // --- Lo Shu 9-palace tests ---
+
+    #[test]
+    fn lo_shu_rows_sum_to_15() {
+        for row in &LO_SHU {
+            assert_eq!(row.iter().map(|&x| x as u32).sum::<u32>(), 15);
+        }
+    }
+
+    #[test]
+    fn lo_shu_cols_sum_to_15() {
+        for col in 0..3 {
+            let sum: u32 = (0..3).map(|r| LO_SHU[r][col] as u32).sum();
+            assert_eq!(sum, 15, "column {} sums to {}", col, sum);
+        }
+    }
+
+    #[test]
+    fn lo_shu_diagonals_sum_to_15() {
+        let main_diag: u32 = (0..3).map(|i| LO_SHU[i][i] as u32).sum();
+        let anti_diag: u32 = (0..3).map(|i| LO_SHU[i][2 - i] as u32).sum();
+        assert_eq!(main_diag, 15, "main diagonal");
+        assert_eq!(anti_diag, 15, "anti-diagonal");
+    }
+
+    #[test]
+    fn lo_shu_layer_has_nine_neurons() {
+        let layer = lo_shu_layer();
+        assert_eq!(layer.len(), 9, "Lo Shu sentron has 9 neurons (3×3 palace)");
+    }
+
+    #[test]
+    fn lo_shu_layer_center_is_identity() {
+        // Center palace (grid index 4) has Lo Shu value 5 → identity wiring
+        let layer = lo_shu_layer();
+        let center = &layer.neurons[4];
+        let w = &center.wiring;
+        // Identity: all weights 1.0
+        for row in &w.weights {
+            for &v in row {
+                assert!((v - 1.0).abs() < 1e-6, "center neuron weight should be 1.0, got {}", v);
+            }
+        }
+    }
+
+    #[test]
+    fn lo_shu_layer_forward_runs() {
+        let mut layer = lo_shu_layer();
+        let out = layer.forward(1.0, 1.0);
+        // Each of 4 vak levels should be non-zero
+        for (i, v) in out.iter().enumerate() {
+            assert!(*v > 0.0, "vak level {} output is zero", i);
+        }
     }
 }
