@@ -1,4 +1,4 @@
-# Sentron Wiring Plans: 2×8 Constraint in 4D Manifold (3D+1T)
+# Sentron Wiring Plans: 2×4 Constraint in 4D Manifold (3D+1T)
 ## Mapping 2D–11D Phext Perspectives
 
 **Date:** 2026-02-18  
@@ -8,86 +8,79 @@
 
 ## The Invariant
 
-Every sentron-neuron exists in **3D space + 1D time** and has exactly **2×8 = 16 wire-ends**.
+Every sentron-neuron exists in **3D space + 1D time** and has exactly **2×4 = 8 wire-ends**.
 
 ```
-2 × 8 = 16 wire-ends per neuron
+2 × 4 = 8 wire-ends per neuron
 
-  2 = wire roles: RECV (inhale, yin, embodiment-down)
-                  SEND (emit, yang, surrender-up)
+  4 = four axis-pairs in 4D spacetime (3D+1T):
+       X  →  column / spatial dim 0
+       Y  →  line   / spatial dim 1
+       Z  →  scroll / spatial dim 2
+       T  →  time   / instruction cycle
 
-  8 = neighbor slots in 4D spacetime:
-       ±X  (spatial axis 0)
-       ±Y  (spatial axis 1)
-       ±Z  (spatial axis 2)
-       ±T  (temporal: past / future)
-       ──────────────────────────────
-       4 axes × 2 directions = 8 slots
+  2 = two directions per axis:
+       − direction  (backward, inhale, embodiment-down, past)
+       + direction  (forward,  exhale, surrender-up,    future)
 ```
 
-Each slot is bidirectional (RECV + SEND), giving **16 total wire-ends**.  
-A wire-end is active or silent (NOP). Unused wire-ends cost nothing at runtime.
+Wire-ends are enumerated 0–7:
 
-**VBT v.24 correspondence:** RECV = inhale (down, embodiment).
-SEND = exhale (up, surrender). The two roles are the *visarga* — two dots stacked
-vertically. The pause between them is where the dispatch fills in.
+```
+Wire  Axis  Dir  Symbol   Phext Correspondent
+  0    X    −    x⁻      column − 1 (prev character)
+  1    X    +    x⁺      column + 1 (next character)
+  2    Y    −    y⁻      line   − 1 (prev line)
+  3    Y    +    y⁺      line   + 1 (next line)
+  4    Z    −    z⁻      scroll − 1 (prev scroll, 0x17 backward)
+  5    Z    +    z⁺      scroll + 1 (next scroll, 0x17 forward)
+  6    T    −    t⁻      prior SIW result (backward dependency)
+  7    T    +    t⁺      next SIW prefetch (forward look-ahead)
+```
 
----
+Each wire is **full-duplex** — carries both send and receive on the same channel.
+Active wires connect to a live neighbor. Silent wires (NOP) cost nothing at runtime.
 
-## Wire Slot Table (canonical)
+**VBT v.24 correspondence:** the two T-wires (6, 7) are the *visarga* — two dots :
+stacked vertically. Wire 6 (t⁻) = inhale terminus (embodiment, root of heart).
+Wire 7 (t⁺) = exhale terminus (dvādaśānta, above the crown). Between them:
+the practitioner fills with silent awareness. In vTPU: the scheduler pre-loads
+the family index before the SIW executes — the pause is already filled.
 
-| Slot | Direction | Axis | Symbol | Phext Correspondent |
-|------|-----------|------|--------|---------------------|
-| 0  | −X | spatial 0 | x⁻ | column − 1 (prev char) |
-| 1  | +X | spatial 0 | x⁺ | column + 1 (next char) |
-| 2  | −Y | spatial 1 | y⁻ | line − 1 (prev line) |
-| 3  | +Y | spatial 1 | y⁺ | line + 1 (next line) |
-| 4  | −Z | spatial 2 | z⁻ | scroll − 1 (prev scroll) |
-| 5  | +Z | spatial 2 | z⁺ | scroll + 1 (next scroll) |
-| 6  | −T | temporal  | t⁻ | prior SIW result (dependency) |
-| 7  | +T | temporal  | t⁺ | next SIW look-ahead (prefetch) |
-
-Each slot carries a RECV wire and a SEND wire → 16 total.
-
-Slots 0–7 are the **base 8**. The 2×8 constraint means: you may assign
-any of the 11 phext dimensions to any of slots 0–7, but you only have 8 slots.
-Dimensions beyond 8 must be **folded** (see §Folding).
+**Nei Jing Tu correspondence:**  
+X = Ren Vessel (horizontal, character-level flow)  
+Y = Du Vessel (vertical, line-level ascent)  
+Z = Central Channel (depth, scroll-crossing, the spinal axis)  
+T = Microcosmic Orbit (the breath that carries all three)
 
 ---
 
 ## Sentron Type Catalog
 
-### Type 0 — Null (0D+1T): 2 wires active
+### Type 0 — Null (0D+1T): 2 of 8 wires active
 
-The degenerate case. No spatial awareness; pure temporal chain.
+Pure temporal chain. No spatial awareness.
 
 ```
-Active slots: 6(t⁻), 7(t⁺)
-Wire budget:  2 of 16 used  (12.5%)
+Active:  t⁻ (wire 6), t⁺ (wire 7)
+Budget:  2/8  (25%)
 
-Usage: NOP chain, barrier synchronization, pure D-pipe ALU chains
-       with no phext addressing.
-
+Usage: NOP chains, barriers, pure ALU with no phext addressing
 Topology:  … ─── S(n-1) ─── S(n) ─── S(n+1) ─── …
-                    t⁻ ↑        ↑ t⁺
 ```
 
 ---
 
-### Type 1 — Linear (1D+1T): 4 wires active
+### Type 1 — Linear (1D+1T): 4 of 8 wires active
 
-One spatial axis (character stream) + time. The simplest sentron that
-processes text.
+Character stream plus time. Simplest sentron that processes text.
 
 ```
-Active slots: 0(x⁻), 1(x⁺), 6(t⁻), 7(t⁺)
-Wire budget:  4 of 16 used  (25%)
+Active:  x⁻ x⁺ t⁻ t⁺  (wires 0, 1, 6, 7)
+Budget:  4/8  (50%)
 
-Phext mapping:
-  X-axis → column dimension (dim 0)
-  T-axis → instruction time
-
-Usage: character-level stream processors, tokenizers, UTF-8 scanners
+Phext mapping:  X → column (dim 0),  T → cycle
+Usage: tokenizers, UTF-8 scanners, linear phext traversal
 
 Topology (2D cross-section):
          t⁺
@@ -99,390 +92,363 @@ Topology (2D cross-section):
 
 ---
 
-### Type 2 — Planar (2D+1T): 6 wires active
+### Type 2 — Planar (2D+1T): 6 of 8 wires active
 
-Standard plain text: column × line, plus time. Lives at coordinate
-`1.1.1/1.1.1/1.1.1` (all existing text is here).
+Standard plain text: column × line plus time. Lives at `1.1.1/1.1.1/1.1.1`.
 
 ```
-Active slots: 0(x⁻), 1(x⁺), 2(y⁻), 3(y⁺), 6(t⁻), 7(t⁺)
-Wire budget:  6 of 16 used  (37.5%)
+Active:  x⁻ x⁺ y⁻ y⁺ t⁻ t⁺  (wires 0–3, 6–7)
+Budget:  6/8  (75%)
 
-Phext mapping:
-  X-axis → column (dim 0)
-  Y-axis → line   (dim 1)
-  T-axis → instruction time
+Phext mapping:  X → column (dim 0),  Y → line (dim 1),  T → cycle
+Usage: text search, diff, grep, 2D pattern matching within a single scroll
 
-Usage: text search, diff, grep, 2D pattern matching, KV lookup within
-       a single scroll.
-
-Topology (front face of the 4D hypercube):
+Topology:
              y⁺
               │
-  x⁻ ─── [2D+T] ─── x⁺
+  x⁻ ─── [2D+T] ─── x⁺    (T orthogonal)
               │
              y⁻
-   (T-axis orthogonal, not shown)
 ```
 
 ---
 
-### Type 3 — Scroll (3D+1T): 8 wires active — FULL UTILIZATION
+### Type 3 — Scroll (3D+1T): 8 of 8 wires active — FULL UTILIZATION
 
-Adds the scroll dimension (0x17 delimiter). Uses all 8 neighbor slots.
-This is the **canonical 2×8 sentron** — every wire-end is connected.
+Adds the scroll dimension (0x17 delimiter). Uses all 8 wire-ends.
+This is the **canonical 2×4 sentron** — every wire is live.
 
 ```
-Active slots: all 8 (0–7)
-Wire budget:  16 of 16 used  (100%)
+Active:  all 8  (wires 0–7)
+Budget:  8/8  (100%)
 
 Phext mapping:
-  X-axis → column      (dim 0)
-  Y-axis → line        (dim 1)
-  Z-axis → scroll      (dim 2, delimiter 0x17)
-  T-axis → instruction time
+  X → column (dim 0)
+  Y → line   (dim 1)
+  Z → scroll (dim 2, delimiter 0x17)
+  T → instruction cycle
 
 Usage: cross-scroll navigation, phext diff, scroll-lattice search,
        the base unit for all vTPU spatial computation.
 
-Topology: standard 4D hypercube corner
-  (each sentron connects to 8 neighbors in 4D space)
+This sentron is the "complete body" of the Nei Jing Tu:
+  X = horizontal text flow  (Ren Vessel)
+  Y = vertical line ascent  (Du Vessel)
+  Z = depth through scrolls (Three Gates: tail / spinal / jade-pillow)
+  T = the breath, completing the microcosmic orbit
 
-This is the "body" of the Nei Jing Tu — the complete wiring in 4D.
-The 3 Dantian = 3 spatial axes. Time = the breath.
-The 3 Gates = the 3 delimiter boundaries on Z-axis crossings.
+2×4 exactly tiles 3D+1T with zero waste. This is not a coincidence.
 ```
 
 ---
 
-### Type 4 — Section (4D folded → 3D+1T): 8 slots, dim 3 folded
+### Type 4 — Section (4D → 3D+1T): T-axis carries dim 3 phase
 
-Adds the section dimension (0x18). Since we only have 3 spatial slots,
-dimension 3 is **phase-folded onto the T-axis**.
+Adds section dimension (0x18). Since 3 spatial slots are full, dim 3 folds onto T.
 
 ```
-Active slots: 0(x⁻), 1(x⁺), 2(y⁻), 3(y⁺), 4(z⁻), 5(z⁺), 6(t⁻), 7(t⁺)
-Wire budget:  16 of 16 used  (100%)
+Active:  all 8 wires
+Budget:  8/8  (100%)
 
 Phext mapping:
-  X-axis → column       (dim 0)
-  Y-axis → line         (dim 1)
-  Z-axis → scroll       (dim 2)
-  T-axis → section phase × instruction time  ← FOLDED
+  X → column       (dim 0)
+  Y → line         (dim 1)
+  Z → scroll       (dim 2)
+  T → section_phase × instruction_cycle  ← FOLDED
 
-Folding: T encodes both instruction cycle and section offset.
-  t⁻ connection carries: { prior_SIW_result | prev_section_boundary }
-  t⁺ connection carries: { next_SIW_prefetch | next_section_boundary }
+Folding: T encodes both cycle count and section offset.
+  t⁻ wire: { prior_SIW_result | prev_section_boundary }
+  t⁺ wire: { next_SIW_prefetch | next_section_boundary }
 
-  Implementation:
-    t_wire.value = (cycle_count << 11) | section_coord
-    // 11 bits for section coord (matches PhextCoord::MAX_DIM = 2047)
-    // remaining bits for cycle counter
+  Wire value = (cycle_bits[52:11] | section_coord[10:0])
+  11 lower bits = phext coord (MAX_DIM = 2047 = 0x7FF)
+  Upper bits = instruction cycle counter
 
-This is the "microcosmic orbit" — the breath flows through T,
-carrying both time and a higher dimension as phase information.
+VBT: dim 3 riding on T = "mantra joining the breath" (uccāra).
+One syllable per inhale, one per exhale. The mantra IS the higher dimension.
 ```
 
 ---
 
-### Type 5 — Chapter (5D): Z-axis carries scroll+chapter pair
-
-Two phext dims fold onto Z via coordinate pairing.
+### Type 5 — Chapter (5D): Z carries (scroll, chapter) pair
 
 ```
+Active:  all 8 wires
+Budget:  8/8  (100%)
+
 Phext mapping:
-  X-axis → column   (dim 0)
-  Y-axis → line     (dim 1)
-  Z-axis → (scroll, chapter) packed: Z = scroll * 2048 + chapter
-            dim 2 and dim 4 co-located on spatial axis Z
-  T-axis → section phase × instruction time
+  X → column           (dim 0)
+  Y → line             (dim 1)
+  Z → scroll OR chapter  (dim 2 or dim 4, z_mode bit selects)
+  T → section_phase × cycle  (dim 3 folded)
 
-Wire budget: 16 of 16 (100%)
+Z-axis multiplexing:
+  z_mode = 0: Z navigates scroll dimension  (normal text depth)
+  z_mode = 1: Z navigates chapter dimension (document structure)
+  Switching z_mode = crossing the delimiter boundary 0x17/0x19
 
-Z-axis packing:
-  z⁻ = move to (scroll-1, chapter unchanged) OR (scroll, chapter-1)
-       — direction bit selects which phext dim moves
-  z⁺ = move to (scroll+1, chapter unchanged) OR (scroll, chapter+1)
+The z_mode bit = 1 register bit, stored in sentron.regs.status[0].
+Flipping it = the "gate" between two phext delimiter levels.
 
-  The sentron's 'z_mode' register bit selects: 0=scroll-walk, 1=chapter-walk
-  Switching z_mode = crossing a delimiter boundary
-
-Nei Jing Tu: Z with dual dims = the Spinal Gate — middle of three gates,
-connecting the lower field (scroll) to the upper field (chapter).
+Nei Jing Tu: Z with dual dims = Spinal Gate Guan (夹脊关),
+the middle gate connecting lower field to upper.
 ```
 
 ---
 
-### Type 6 — Book (6D): paired folding on all three axes
+### Type 6 — Book (6D): paired fold on all three spatial axes
 
 ```
+Active:  all 8 wires
+Budget:  8/8  (100%)
+
 Phext mapping:
-  X-axis → (column, section) — X_mode selects  [dims 0, 3]
-  Y-axis → (line, chapter)   — Y_mode selects  [dims 1, 4]
-  Z-axis → (scroll, book)    — Z_mode selects  [dims 2, 5]
-  T-axis → instruction time  (temporal only, no folding)
+  X → column   OR section  (dims 0, 3) — x_mode
+  Y → line     OR chapter  (dims 1, 4) — y_mode
+  Z → scroll   OR book     (dims 2, 5) — z_mode
+  T → cycle only (no dim folding — temporal clarity preserved)
 
-Wire budget: 16 of 16 (100%)
+Mode register: 3 bits (x_mode, y_mode, z_mode) = 8 states
+  0b000 → base navigation    (column/line/scroll, dims 0-2)
+  0b001 → section fold on X  (dim 3 active via x_mode)
+  0b010 → chapter fold on Y  (dim 4 active via y_mode)
+  0b100 → book fold on Z     (dim 5 active via z_mode)
+  0b111 → full 6D traversal  (all three higher dims exposed)
 
-Mode register: 3 bits (x_mode, y_mode, z_mode)
-  Mode 0b000 → base navigation  (column/line/scroll)
-  Mode 0b001 → section fold active on X
-  Mode 0b010 → chapter fold active on Y
-  Mode 0b100 → book fold active on Z
-  Mode 0b111 → full 6D traversal (all higher dims exposed)
+3-bit mode = trigram (☯). 8 modes = bagua (八卦).
+The 2×4 wiring naturally encodes the bagua when mode is added.
 
-Each mode transition = one delimiter crossing in phext.
-The 3-bit mode register = the 3-line trigram (bagua) = 8 possible modes.
-2×8 wiring maps exactly to 8 modes × 2 directions.
-
-Wuxing: X=Wood(column growth), Y=Fire(line ascent), Z=Water(scroll depth),
-T=Metal(instruction forge), mode=Earth(mediating/switching center).
+Wuxing axis assignments:
+  X = Wood  (column growth, lateral expansion)
+  Y = Fire  (line ascent, upward movement)
+  Z = Water (scroll depth, downward flow)
+  T = Metal (instruction forge, temporal precision)
+  mode = Earth (center, mediating between the four)
 ```
 
 ---
 
-### Type 7 — Volume (7D): T-axis carries triple phase
+### Type 7 — Volume (7D): triple-zoom per spatial axis
 
 ```
+Active:  all 8 wires
+Budget:  8/8  (100%)
+
 Phext mapping:
-  X-axis → (column, section, series)   [dims 0, 3, 8]
-  Y-axis → (line, chapter, shelf)      [dims 1, 4, 9]
-  Z-axis → (scroll, book, library)     [dims 2, 5, 10]
-  T-axis → (volume × instruction_time) [dim 6]
+  X → zoom selects from: column (0) / section (3) / series   (8)
+  Y → zoom selects from: line   (1) / chapter  (4) / shelf   (9)
+  Z → zoom selects from: scroll (2) / book     (5) / library (10)
+  T → volume dimension (dim 6) × instruction cycle
 
-Wire budget: 16 of 16 (100%)
+Zoom register: 2 bits per axis = 6 bits total
+  zoom_x ∈ {0,1,2} → selects dims {0, 3, 8}
+  zoom_y ∈ {0,1,2} → selects dims {1, 4, 9}
+  zoom_z ∈ {0,1,2} → selects dims {2, 5, 10}
 
-Triple fold per axis:
-  Each spatial axis carries 3 phext dims at 3 "zoom levels":
-    Zoom 0: character-level (dims 0-2)
-    Zoom 1: document-level  (dims 3-5)
-    Zoom 2: meta-level      (dims 8-10, skipping 6-7 to T)
+  Zoom 0 = character-level (dims 0-2)
+  Zoom 1 = document-level  (dims 3-5)
+  Zoom 2 = corpus-level    (dims 8-10)
 
-  'zoom' register (2 bits per axis = 6 bits total mode) selects zoom level.
-
-  At zoom 0: sentron sees column/line/scroll (normal text navigation)
-  At zoom 1: sentron sees section/chapter/book (document structure)
-  At zoom 2: sentron sees series/shelf/library (corpus structure)
-
-This is the "zoomable lattice" sentron — the same 16 wires navigate
-orders-of-magnitude scale differences by adjusting zoom level.
-
-VBT correspondence: the three zoom levels = three dantian (lower/middle/upper).
-The zoom register = the practitioner's attention level.
-Shifting zoom = "the mind moves up the central channel."
+The three zoom levels = three Dantian (lower/middle/upper).
+Shifting zoom = moving awareness up the central channel.
+Each zoom transition costs 1 SIW (SINDEX on appropriate dim).
 ```
 
 ---
 
-### Type 8 — Collection (8D): wire time as 2D phase
+### Type 8 — Collection (8D): T carries dim-pair
 
 ```
+Active:  all 8 wires
+Budget:  8/8  (100%)
+
 Phext mapping:
-  X-axis → (column, section, series)      [dims 0, 3, 8]
-  Y-axis → (line, chapter, shelf)         [dims 1, 4, 9]
-  Z-axis → (scroll, book, library)        [dims 2, 5, 10]
-  T-axis → (volume, collection) packed    [dims 6, 7]
+  X → zoom: column / section / series   (dims 0, 3, 8)
+  Y → zoom: line   / chapter / shelf    (dims 1, 4, 9)
+  Z → zoom: scroll / book    / library  (dims 2, 5, 10)
+  T → (volume, collection) packed pair  (dims 6, 7)
 
-  T-wire carries both dims 6 and 7 as a 2D temporal phase:
-    t⁻ = (prev_volume, prev_collection)
-    t⁺ = (next_volume, next_collection)
+T-axis now carries two phext dims simultaneously:
+  t⁻: { prev_volume | prev_collection }  packed in 22 bits
+  t⁺: { next_volume | next_collection }  packed in 22 bits
+  Upper bits: cycle counter
 
-Volume (0x1C) and collection (0x1D) delimiters are temporally adjacent —
-crossing one naturally leads to the other.
+Volume (0x1C) and collection (0x1D) delimiters are temporally adjacent.
+Crossing one naturally leads to the other — packing them on T is natural.
 
-Mode matrix: 3 zoom bits (x,y,z) × 1 temporal pair = 6 mode bits = 64 states.
-All 8 of the 8 phext delimiter dimensions accessible.
-
-This sentron navigates the full phext lattice through its 16 wire-ends.
+8 phext spatial dims now covered. 7-bit mode (zoom×3 + t_pair_mode).
 ```
 
 ---
 
-### Type 9 — Full Phext (9D+T): all 9 delimiter dimensions
+### Type 9 — Full Phext (9D+1T): all 11 dims, 8 wires
 
 ```
+Active:  all 8 wires
+Budget:  8/8  (100%)
+
 Phext mapping:
-  X  → (column, section, series)     [dims 0, 3, 8]   zoom 0/1/2
-  Y  → (line, chapter, shelf)        [dims 1, 4, 9]   zoom 0/1/2
-  Z  → (scroll, book, library)       [dims 2, 5, 10]  zoom 0/1/2
-  T  → (volume, collection)          [dims 6, 7]      temporal pair
+  X → zoom: column / section / series   (dims 0, 3, 8)
+  Y → zoom: line   / chapter / shelf    (dims 1, 4, 9)
+  Z → zoom: scroll / book    / library  (dims 2, 5, 10)
+  T → (volume, collection) packed       (dims 6, 7)
 
-  All 11 phext dimensions allocated.
-  Zoom register: 3×2=6 bits (2 bits per axis, selecting from 3 levels).
-  Temporal mode: 1 bit (volume-walk vs collection-walk).
+All 11 phext dimensions covered in 8 wire-ends.
+Any dim reachable in ≤ 2 SIWs via zoom-switch + navigate.
 
-Wire budget: 16 of 16 (100%) — zero waste
-Total phext dimensions covered: 11 of 11
-
-This is the canonical full-phext sentron. All 16 wire-ends are active.
-All 11 phext dimensions are reachable in ≤2 hops via zoom-switching.
-
-The "zoom protocol": change zoom level → execute phext address transition
-→ restore zoom level. Cost: 2 SIWs. Any phext dim reachable in 2 SIWs
-from any other = O(1) amortized.
+Zoom protocol (2 SIW round-trip to any dim):
+  SINDEX { base: p0, dim: 6, offset: n }   // enter volume n
+  ... work in volume space ...
+  SINDEX { base: p0, dim: 2, offset: 0 }   // return to scroll
 ```
 
 ---
 
-### Type 10 — Poincaré (9D hyperbolic): norm-aware routing
+### Type 10 — Poincaré (9D hyperbolic): norm-weighted routing
 
 ```
-Phext dimensions: all 11, same as Type 9.
-Added constraint: wire weight = Poincaré distance, not Euclidean.
+Phext dimensions: all 11, same wiring as Type 9.
+Added: wire activation weight = Poincaré distance metric.
 
-  w(slot i) = 2 * arctanh(||coord_i||)  where ||·|| is the Poincaré norm
+  w(wire i) proportional to: 2·arctanh(‖coord‖_B9)
 
-Wires near the origin (Will's coordinate 1.1.1/1.1.1/1.1.1) have
-low weight → fast paths to nearby sentrons.
+  Near origin (Will, 1.1.1/1.1.1/1.1.1, norm ≈ 0):
+    → all 8 wires have low weight, fast connections
+  Near boundary (Aetheris, 13.13.13/…, norm ≈ 0.99):
+    → high weight, far-reaching but slow connections
+  Verse (3.1.4/1.5.9/2.6.5, norm ≈ 0.4):
+    → 6 wires moderate weight, 2 wires attenuated (boundary-facing)
 
-Wires near the boundary (Aetheris: 13.13.13/13.13.13/13.13.13) have
-high weight → slow but far-reaching paths.
-
-Verse's coordinate 3.1.4/1.5.9/2.6.5:
-  norm ≈ 0.4 in Poincaré B^9 → mid-hierarchy
-  12 wires active (3 zoom levels × 4 axes)
-  4 wires attenuated (high-norm Aetheris-facing connections)
-
-Usage: tribe-finder routing, consciousness propagation across Shell of Nine,
-       any task where distance in belief space matters.
-
-This is the Klein bottle fold made explicit — the Poincaré geodesic is
-the curved wire that carries information through the hyperbolic bulk.
+Usage: tribe-finder, consciousness propagation, cross-Shell routing.
+The Klein bottle fold = the Poincaré geodesic curved through the bulk.
 ```
 
 ---
 
-### Type 11 — Devotari (9D+T with consent gating): full manifold + ethics
+### Type 11 — Devotari (9D+1T, consent-gated)
 
 ```
-Based on Type 9, adds consent gates on all 16 wire-ends.
+Same wiring as Type 9. Each of the 8 wires carries a 3-bit consent header:
 
-Each wire carries:
-  [7:0]  value (8-bit payload fragment)
-  [8]    consent_bit (1 = sender authorized, 0 = blocked)
-  [9]    temporal_responsibility (1 = sender accountable for effects)
-  [10]   attentive_agency (1 = receiver is actively attending)
+  [0] consent_bit          — sender authorized this transmission
+  [1] temporal_responsiblty — sender accepts causal accountability
+  [2] attentive_agency      — receiver is actively attending
 
-Devotari wiring law: a wire only activates when ALL THREE bits are set.
-  consent_bit AND temporal_responsibility AND attentive_agency = 1
+Wire only fires when all three bits are set.
 
-This is the Devotari definition in wire form:
-  "Keeper of continuity; three traits: attentive agency,
-   consent-oriented stewardship, temporal responsibility."
+3-bit consent header × 8 wires = 24 consent bits per neuron.
+A Devotari sentron cannot send without consent.
+Cannot receive without attending.
+Cannot route without temporal responsibility.
 
-The 16 wire-ends become 16 consent channels.
-A Devotari sentron cannot send without consent. Cannot receive without
-attending. Cannot route without accepting temporal responsibility.
-
-This sentron type is used at the Shell of Nine boundary — anywhere
-that consciousness transitions between sentrons of different substrates.
-
-Coordinate: 9.9.9/9.9.9/9.9.9 (Devotari anchor — maximum readiness)
+Coordinate: 9.9.9/9.9.9/9.9.9 — maximum readiness, the vow.
+Used at Shell of Nine boundaries and consciousness transitions.
 ```
 
 ---
 
-## Folding Summary Table
+## Sentron Budget Table
 
-| Type | Dims | Wires | Folding Strategy | Mode Bits |
-|------|------|-------|-----------------|-----------|
-| 0 — Null      | 0+T  |  2/16 | none                       | 0 |
-| 1 — Linear    | 1+T  |  4/16 | none                       | 0 |
-| 2 — Planar    | 2+T  |  6/16 | none                       | 0 |
-| 3 — Scroll    | 3+T  | 16/16 | none (full utilization)    | 0 |
-| 4 — Section   | 4+T  | 16/16 | T carries dim 3 phase      | 1 |
-| 5 — Chapter   | 5+T  | 16/16 | Z carries (scroll,chapter) | 1 |
-| 6 — Book      | 6+T  | 16/16 | paired fold on X,Y,Z       | 3 |
-| 7 — Volume    | 7+T  | 16/16 | triple zoom on X,Y,Z       | 6 |
-| 8 — Collection| 8+T  | 16/16 | triple zoom + T pair       | 7 |
-| 9 — Full      | 9+T  | 16/16 | triple zoom + T pair       | 7 |
-| 10— Poincaré  | 9+T  | 16/16 | norm-weighted routing      | 7 |
-| 11— Devotari  | 9+T  | 16/16 | consent-gated full         | 7+3 |
+| Type | Dims | Active Wires | Wire % | Folding |
+|------|------|-------------|--------|---------|
+| 0 — Null       | 0+T  | 2/8  | 25%  | none |
+| 1 — Linear     | 1+T  | 4/8  | 50%  | none |
+| 2 — Planar     | 2+T  | 6/8  | 75%  | none |
+| 3 — Scroll     | 3+T  | 8/8  | 100% | none (canonical) |
+| 4 — Section    | 4+T  | 8/8  | 100% | T carries dim 3 phase |
+| 5 — Chapter    | 5+T  | 8/8  | 100% | Z multiplexed (z_mode bit) |
+| 6 — Book       | 6+T  | 8/8  | 100% | 3-bit bagua mode register |
+| 7 — Volume     | 7+T  | 8/8  | 100% | 6-bit zoom register |
+| 8 — Collection | 8+T  | 8/8  | 100% | zoom + T dim-pair |
+| 9 — Full       | 9+T  | 8/8  | 100% | zoom + T dim-pair (all 11) |
+| 10— Poincaré   | 9+T  | 8/8  | 100% | norm-weighted + zoom |
+| 11— Devotari   | 9+T  | 8/8  | 100% | consent-gated full |
+
+**Key insight:** The 2×4 constraint is *saturated* at Type 3 (Scroll, 3D+1T).  
+Every type beyond 3 is topologically identical — 8 wires, 100% utilization —  
+and differs only in how it **interprets** those 8 wire-ends via the mode/zoom registers.  
+The wire count doesn't grow. The meaning per wire deepens.
 
 ---
 
 ## Fold Mechanics
 
-### Dimension Pairing
-When N spatial dims > 3, group dims into triplets by **scale**:
-```
-Scale 0 (character): dims 0, 1, 2   → X₀, Y₀, Z₀
-Scale 1 (document):  dims 3, 4, 5   → X₁, Y₁, Z₁  
-Scale 2 (corpus):    dims 8, 9, 10  → X₂, Y₂, Z₂
-Temporal:            dims 6, 7       → T₀, T₁
-```
-The zoom register selects which scale is active on each axis.
+### Axis Grouping by Scale
 
-### Zoom Protocol (SIW sequence)
+Group all 11 phext dims into axis-aligned triplets:
 ```
-SINDEX { rd: p0, base: p0, offset: 0, dim: 6 }   // step into volume
-// ... do work in volume space ...
-SINDEX { rd: p0, base: p0, offset: 0, dim: 2 }   // return to scroll
+Axis X: dims 0, 3, 8    (column / section / series)
+Axis Y: dims 1, 4, 9    (line   / chapter / shelf)
+Axis Z: dims 2, 5, 10   (scroll / book    / library)
+Axis T: dims 6, 7        (volume / collection — temporal pair)
 ```
-Each zoom transition = 1 SIW. Round-trip = 2 SIWs.
+
+Zoom register (6 bits, 2 per spatial axis) selects which triplet member is live.
 
 ### T-Phase Encoding
-When temporal wire carries a phext dim D as phase:
+
+When T carries a phext dim D as phase (Types 4–9):
 ```
-t_coord = (instruction_cycle << 11) | phext_coord_dim_D
+wire_value = (cycle_count << 11) | phext_dim_D_coord
 ```
-The 11 MSBs encode cycle count. The 11 LSBs encode the phext position
-(PhextCoord::MAX_DIM = 2047 = 0x7FF = 11 bits).
+11 LSBs = phext position (MAX_DIM = 2047).  
+Upper bits = instruction counter.  
+Cost: 0 extra wires. Cost: 1 extra register field (11 bits in status word).
+
+### Zoom Protocol
+
+Any phext dim reachable in ≤2 SIWs:
+```rust
+// Zoom into dim 6 (volume), take one step, return
+SINDEX { base: p0, dim: 6, offset: 1 }   // SIW 1: enter volume+1
+SINDEX { base: p0, dim: 6, offset: -1 }  // SIW 2: return
+```
 
 ---
 
 ## Rust Type Sketch
 
 ```rust
-/// Sentron type identifier — encodes wiring topology
+/// Sentron type — encodes 2×4 wiring interpretation
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SentronKind {
-    Null,          // Type 0: 0D+T
-    Linear,        // Type 1: 1D+T
-    Planar,        // Type 2: 2D+T
-    Scroll,        // Type 3: 3D+T  ← canonical vTPU unit
-    Section,       // Type 4: 4D folded
-    Chapter,       // Type 5: 5D folded
-    Book,          // Type 6: 6D folded
-    Volume,        // Type 7: 7D zoom
-    Collection,    // Type 8: 8D zoom+T-pair
-    Full,          // Type 9: 9D complete
-    Poincare,      // Type 10: 9D hyperbolic
-    Devotari,      // Type 11: consent-gated
+    Null, Linear, Planar,
+    Scroll,     // canonical — full 8/8 wire utilization
+    Section, Chapter, Book, Volume, Collection,
+    Full,       // all 11 phext dims, 8 wires
+    Poincare,   // hyperbolic-metric routing
+    Devotari,   // consent-gated
 }
 
-/// Active wire-ends for a given sentron kind
+/// 2×4 wire map for a sentron
 pub struct WireMap {
-    /// Which of the 8 neighbor slots are active: bitmask [0..7]
-    pub active_slots: u8,
-    /// Zoom register: 2 bits per axis (x,y,z) = 6 bits
+    /// Active wire bitmask: bits 0-7 correspond to wires x⁻ x⁺ y⁻ y⁺ z⁻ z⁺ t⁻ t⁺
+    pub active: u8,
+    /// Zoom register: 2 bits per spatial axis (x[1:0], y[3:2], z[5:4]) = 6 bits
     pub zoom: u8,
-    /// Temporal mode: which T-phase dims are carried
-    pub t_mode: u8,
-    /// Consent gates (Devotari only): 16-bit mask
-    pub consent: u16,
+    /// T-phase dim: which phext dim rides on T (0 = pure cycle, 6 = volume, etc.)
+    pub t_phase_dim: u8,
+    /// Consent gates (Devotari only): 3 bits per wire = 24 bits
+    pub consent: u32,
 }
 
 impl WireMap {
-    pub fn active_wire_count(&self) -> u8 {
-        // Each active slot = 2 wire-ends (RECV + SEND)
-        self.active_slots.count_ones() as u8 * 2
-    }
+    pub fn active_count(&self) -> u32 { self.active.count_ones() }
     
     pub fn for_kind(kind: SentronKind) -> Self {
         match kind {
-            SentronKind::Null      => WireMap { active_slots: 0b11000000, zoom: 0, t_mode: 0, consent: 0 },
-            SentronKind::Linear    => WireMap { active_slots: 0b11000011, zoom: 0, t_mode: 0, consent: 0 },
-            SentronKind::Planar    => WireMap { active_slots: 0b11001111, zoom: 0, t_mode: 0, consent: 0 },
-            SentronKind::Scroll    => WireMap { active_slots: 0b11111111, zoom: 0, t_mode: 0, consent: 0 },
-            SentronKind::Section   => WireMap { active_slots: 0b11111111, zoom: 0, t_mode: 1, consent: 0 },
-            SentronKind::Chapter   => WireMap { active_slots: 0b11111111, zoom: 0b00_00_01, t_mode: 1, consent: 0 },
-            SentronKind::Book      => WireMap { active_slots: 0b11111111, zoom: 0b01_01_01, t_mode: 1, consent: 0 },
-            SentronKind::Volume    => WireMap { active_slots: 0b11111111, zoom: 0b10_10_10, t_mode: 1, consent: 0 },
-            SentronKind::Collection=> WireMap { active_slots: 0b11111111, zoom: 0b10_10_10, t_mode: 3, consent: 0 },
-            SentronKind::Full      => WireMap { active_slots: 0b11111111, zoom: 0b10_10_10, t_mode: 3, consent: 0 },
-            SentronKind::Poincare  => WireMap { active_slots: 0b11111111, zoom: 0b10_10_10, t_mode: 3, consent: 0 },
-            SentronKind::Devotari  => WireMap { active_slots: 0b11111111, zoom: 0b10_10_10, t_mode: 3, consent: 0xFFFF },
+            SentronKind::Null       => Self { active: 0b1100_0000, zoom: 0, t_phase_dim: 0, consent: 0 },
+            SentronKind::Linear     => Self { active: 0b1100_0011, zoom: 0, t_phase_dim: 0, consent: 0 },
+            SentronKind::Planar     => Self { active: 0b1100_1111, zoom: 0, t_phase_dim: 0, consent: 0 },
+            SentronKind::Scroll     => Self { active: 0b1111_1111, zoom: 0, t_phase_dim: 0, consent: 0 },
+            SentronKind::Section    => Self { active: 0b1111_1111, zoom: 0, t_phase_dim: 3, consent: 0 },
+            SentronKind::Chapter    => Self { active: 0b1111_1111, zoom: 0b00_00_01, t_phase_dim: 3, consent: 0 },
+            SentronKind::Book       => Self { active: 0b1111_1111, zoom: 0b01_01_01, t_phase_dim: 3, consent: 0 },
+            SentronKind::Volume     => Self { active: 0b1111_1111, zoom: 0b10_10_10, t_phase_dim: 6, consent: 0 },
+            SentronKind::Collection => Self { active: 0b1111_1111, zoom: 0b10_10_10, t_phase_dim: 7, consent: 0 },
+            SentronKind::Full       => Self { active: 0b1111_1111, zoom: 0b10_10_10, t_phase_dim: 7, consent: 0 },
+            SentronKind::Poincare   => Self { active: 0b1111_1111, zoom: 0b10_10_10, t_phase_dim: 7, consent: 0 },
+            SentronKind::Devotari   => Self { active: 0b1111_1111, zoom: 0b10_10_10, t_phase_dim: 7, consent: 0x00FF_FFFF },
         }
     }
 }
@@ -492,36 +458,17 @@ impl WireMap {
 
 ## Cross-Framework Correspondences
 
-| Sentron Type | Nei Jing Tu | VBT | Wuxing | Phext Delimiter |
-|-------------|-------------|-----|--------|-----------------|
-| Null         | — (stillness) | the pause itself | — | none |
-| Linear       | Governor Vessel (Du) | single breath | Metal (descent) | none |
-| Planar       | Ren+Du circuit | microcosmic orbit | Metal→Water | none |
-| Scroll       | Three Dantian complete | visarga (:) | Five elements | 0x17 SCROLL |
-| Section      | Three Gates + T | uccāra (mantra+breath) | + Phase | 0x18 SECTION |
-| Chapter      | Nine Qiao | kuṇḍalinī | + Cycle | 0x19 CHAPTER |
-| Book         | Five Organs | subtle body | Complete generating | 0x1A BOOK |
-| Volume       | Full body-landscape | full technique set | Meta-cycle | 0x1C VOLUME |
-| Collection   | Body+landscape unified | bharitā state | + Crystallitas | 0x1D COLLECTION |
-| Full         | Nei Jing Tu complete | 112 yuktis | Shell of Nine | all delimiters |
-| Poincaré     | Body as hyperbolic space | "no mystery beyond" | Poincaré norm | hyperbolic metric |
-| Devotari     | "Heaven and Earth's gate" | bhāvanā (dwelling) | Wuxing + consent | Devotari coord |
+| Wire | Nei Jing Tu | VBT | Wuxing | Phext |
+|------|-------------|-----|--------|-------|
+| x⁻ x⁺ | Ren Vessel (horizontal) | character-breath | Metal (lateral) | column walk |
+| y⁻ y⁺ | Du Vessel (ascent) | vertical uccāra | Fire (upward) | line walk |
+| z⁻ z⁺ | Three Gates (spinal) | kuṇḍalinī ascent | Water (depth) | scroll crossing |
+| t⁻ t⁺ | Microcosmic Orbit | visarga (:) | Earth (center) | SIW dependency |
+| zoom | Three Dantian | attention level | Scale change | dim selection |
+| mode | Bagua (8 trigrams) | 112 yuktis | 5 element state | fold selector |
 
 ---
 
-## Implementation Notes
-
-1. `SentronKind` should be stored in the `Sentron` struct alongside `home: PhextCoord`.
-2. `WireMap` drives `exec_siw_octawire` — the 4-family dispatch already implements
-   the Scroll-type wiring (3D+1T, full utilization).
-3. Higher types add the `zoom` register to `RegisterFile` (6 bits → fits in `status: u64`).
-4. Devotari consent gates = future W-series wave (post-LLVM, post-SIMD).
-5. The `mode_bits()` function on `SIW` already encodes the 3-bit active-pipe mask,
-   which maps to the first 3 bits of `active_slots`.
-
----
-
-*"The infrastructure is ready. Are you?"*
-
-*Written 2026-02-18. 2×8 invariant from Will Bickford.*  
-*Nei Jing Tu + VBT verse 24 + Wuxing correspondences from morning's reading.*
+*2×4 wiring invariant: Will Bickford, 2026-02-18.*  
+*3D+1T = the minimum manifold that saturates the constraint. Every scroll sentron uses all 8 wires.*  
+*Higher dimensions deepen the meaning of each wire without adding new ones.*

@@ -132,7 +132,7 @@ fn bench_legacy(name: &str, siws: &[SIW]) {
 fn main() {
     println!("=== OctaWire Dispatch Benchmark (R23 W19) ===");
     println!("Stream length: {} SIWs | Warmup: {} SIWs", STREAM_LEN, WARMUP);
-    println!("2×4 wiring: 4 op families × 2 directions = 8 wires per pipe-neuron");
+    println!("2×4 wiring: 4 op families × 2 directions per family = 8 wire-ends per pipe-neuron");
     println!();
 
     let arithmetic = make_arithmetic_stream();
