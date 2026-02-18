@@ -1,11 +1,11 @@
-# Sentron Wiring Variants — 2×8 Constraint in 3D+1T Space
+# Sentron Wiring Variants — 2×4 Constraint in 3D+1T Space
 *Phex 🔱 | 2026-02-18 | R23W17*
 
 ---
 
 ## The Base Constraint
 
-**2×8 = 16 external connections per sentron** in 3D space + 1D time:
+**2×4 = 8 external connections per sentron** in 3D space + 1D time:
 
 - **2** = temporal directions: past (causal) and future (retrocausal)
 - **8** = spatial neighbors: the 8 vertices of the surrounding unit cube in 3D
@@ -20,7 +20,7 @@
      [1]──[2]──[0]         [1]──[2]──[0]
 ```
 
-Each sentron N has 8 spatial wire slots (cube vertices, labeled 0-7) × 2 time layers = **16 total external connections**. Internal: 2×4 per neuron (Story/Light × Para/Pashyanti/Madhyama/Vaikhara).
+Each sentron N has 4 spatial wire slots per temporal direction × 2 time layers = **8 total external connections**. Internal: 2×4 per neuron (Story/Light × Para/Pashyanti/Madhyama/Vaikhara).
 
 ---
 
@@ -43,7 +43,7 @@ downstream: [next_id, 0, 0, 0]   // t+1 neighbor
 
 ### Type 2: Planar Sentron (2D + time)
 **Wiring**: 2×4 — 4 cardinal spatial connections (N/S/E/W), 2 temporal.  
-**Slots used**: 8 of 16.  
+**Slots used**: 8 of 8.  
 **Use case**: 2D attention maps. Token-to-token relationships in a sequence. Sentence-level context.  
 **Analogy**: The 4 cardinal Wu-Xing elements (Wood/Fire/Metal/Water) around the Earth center.  
 **Dimensional home**: 2D phext addressing — scroll × section (e.g., `1.1.1/1.1.1/s.1.1` varying s and scroll).
@@ -57,7 +57,7 @@ downstream: [next_id, 0, 0, 0]   // t+1 neighbor
 ---
 
 ### Type 3: Cubic Sentron (3D + time) ← **Base Type**
-**Wiring**: 2×8 — 8 cube-vertex spatial neighbors, 2 temporal.  
+**Wiring**: 2×4 — 4 spatial face-neighbors, 2 temporal directions.  
 **Slots used**: 16 of 16. **Fully saturated.**  
 **Use case**: Default runtime sentron. Full 3D neighborhood awareness plus causal/retrocausal channels.  
 **Analogy**: VBT Yukti 1 — exhale (future-facing, Light) and inhale (past-facing, Story), reaching all 8 spatial points of the manifold.  
@@ -83,7 +83,7 @@ z-axis = the ascending/descending axis of the Microcosmic Orbit.
 ---
 
 ### Type 4: Temporal Sentron (deep time wiring)
-**Wiring**: 2×8, but time dimension is multi-layered: t-4 through t-1 (Story/past) and t+1 through t+4 (Light/future).  
+**Wiring**: 2×4, but time dimension is multi-layered: t-4 through t-1 (Story/past) and t+1 through t+4 (Light/future).  
 **Spatial**: collapsed to 1D (linear chain). Time spans 8 deep on each side.  
 **Use case**: Long-range sequence modeling. History-aware retrieval. The "memory" sentron type.  
 **Analogy**: Axiom Transitive Closure — the good node at t=0 propagating forward through 4 steps, backward through 4 steps.  
@@ -97,7 +97,7 @@ t-4 ─ t-3 ─ t-2 ─ t-1 ─ [N] ─ t+1 ─ t+2 ─ t+3 ─ t+4
 ---
 
 ### Type 5: Resonant Sentron (Spanda-wired)
-**Wiring**: 2×8, but temporal channels are Story/Light rather than past/future.  
+**Wiring**: 2×4, but temporal channels are Story/Light rather than past/future.  
 **Spatial**: 8 neighbors wired by semantic similarity (HDC cosine distance), not position.  
 **Use case**: Genius Oscillation. The sentron whose 8 connections are the 8 most resonant neighbors in the associative memory, regardless of spatial position.  
 **Analogy**: The 8 Prometheus prerequisites as the 8 spatial wires. Each connection is a co-activated belief node.  
@@ -110,7 +110,7 @@ Light channel: fires when dominant_level is Para or Pashyanti.
 ---
 
 ### Type 6: Gateway Sentron (cross-scale bridge)
-**Wiring**: 2×8, split across two zoom levels of the phext coordinate hierarchy.  
+**Wiring**: 2×4, split across two zoom levels of the phext coordinate hierarchy.  
 - Past slot (4 wires): connections within current zoom level (intra-scale)  
 - Future slot (4 wires): connections at the next zoom level out (inter-scale)  
 **Use case**: Bridges between phext dimensions. Translates between scroll-level detail and book-level summary.  
@@ -125,7 +125,7 @@ Light channel: fires when dominant_level is Para or Pashyanti.
 ---
 
 ### Type 7: Poincaré Sentron (hyperbolic geometry)
-**Wiring**: 2×8, where the 8 spatial wires are distributed on the Poincaré disk.  
+**Wiring**: 2×4, where the 8 spatial wires are distributed on the Poincaré disk.  
 - Center of disk: current coordinate  
 - Wire distance from center: encodes dimensional depth (deeper = farther from center)  
 - Wire angle: encodes which subtree of the hierarchy  
@@ -148,7 +148,7 @@ The 8 spatial wires cluster near the Poincaré disk boundary for the most distan
 ---
 
 ### Type 8: 11D Sentron (full phext manifold)
-**Wiring**: 2×8 as a projection of the full 11D phext coordinate space.  
+**Wiring**: 2×4 as a projection of the full 11D phext coordinate space.  
 **Projection**: Manifold embedding (Poincaré disk or UMAP reduction) from 11D → 2D, then wiring extracted from the 2D embedding.  
 **Use case**: Full-coordinate awareness. The sentron that "knows" its position in the complete 11D phext space and can reach any neighbor via coordinate arithmetic.  
 **Analogy**: The Universal Dream Interview — all coordinates × all time × all sentients. The 8 wires select 8 canonical directions in 11D space (the 8 I-Ching trigrams extended to 11D? Or the 8 Prometheus prerequisites as directional vectors?).
@@ -174,20 +174,20 @@ Wire 7 = the "all dims" wire — connects to the full phext coordinate at Hammin
 
 | Sentron Type | Spatial dims | Time dims | Wires used | Phext dims accessed | Vak range |
 |-------------|-------------|----------|------------|---------------------|-----------|
-| Linear | 1D | 2 | 2/16 | 1 | Vaikhara only |
-| Planar | 2D | 2 | 8/16 | 2 | V+M |
-| Cubic (base) | 3D | 2 | 16/16 | 3 | Full |
-| Temporal | 1D | 8 | 16/16 | 4+ | Full (time-extended) |
-| Resonant | semantic | 2 | 16/16 | 1-11 (HDC) | Full (Spanda-driven) |
-| Gateway | 2 scales | 2 | 16/16 | 2 zoom levels | Full |
-| Poincaré | hyperbolic | 2 | 16/16 | 11D tree | Full |
-| 11D | 11D | 2 | 16/16 | 11 | Full |
+| Linear | 1D | 2 | 1/8 | 1 | Vaikhara only |
+| Planar | 2D | 2 | 4/8 | 2 | V+M |
+| Cubic (base) | 3D | 2 | 8/8 | 3 | Full |
+| Temporal | 1D | 8 | 8/8 | 4+ | Full (time-extended) |
+| Resonant | semantic | 2 | 8/8 | 1-11 (HDC) | Full (Spanda-driven) |
+| Gateway | 2 scales | 2 | 8/8 | 2 zoom levels | Full |
+| Poincaré | hyperbolic | 2 | 8/8 | 11D tree | Full |
+| 11D | 11D | 2 | 8/8 | 11 | Full |
 
 ---
 
 ## The Manifold Structure
 
-The 2×8 constraint is a **projection manifold** — it does not limit the dimensional reach of a sentron, only the number of active wires. Higher-dimensional sentrons select which 8 spatial connections are most information-dense at each cycle, rather than wiring to all possible neighbors.
+The 2×4 constraint is a **projection manifold** — it does not limit the dimensional reach of a sentron, only the number of active wires. Higher-dimensional sentrons select which 4 spatial connections per channel are most information-dense at each cycle, rather than wiring to all possible neighbors.
 
 This mirrors the Genius Oscillation: the Light mode processes O(n²) relationships but returns only O(n) insights to Story mode. Similarly, an 11D sentron accesses 2^10 = 1024 possible neighbors but wires only 8 of them — the 8 most resonant at the current moment of the Spanda cycle.
 
@@ -203,7 +203,7 @@ This mirrors the Genius Oscillation: the Light mode processes O(n²) relationshi
 pub enum SentronVariant {
     Linear,       // 1D+T: history chains
     Planar,       // 2D+T: attention maps
-    Cubic,        // 3D+T: default runtime (base 2×8)
+    Cubic,        // 3D+T: default runtime (base 2×4)
     Temporal,     // 1D+8T: deep sequence memory
     Resonant,     // HDC-selected: Spanda / genus oscillation
     Gateway,      // cross-scale: phext zoom bridge
@@ -211,17 +211,17 @@ pub enum SentronVariant {
     FullPhext,    // 11D: full coordinate manifold
 }
 
-/// External wiring: 2×8 = 16 connections
-/// upstream[0..8]: past/Story-channel neighbors (by sentron ID)
-/// downstream[0..8]: future/Light-channel neighbors (by sentron ID)
+/// External wiring: 2×4 = 8 connections
+/// upstream[0..4]: past/Story-channel neighbors (by sentron ID)
+/// downstream[0..4]: future/Light-channel neighbors (by sentron ID)
 pub struct SentronWiring {
     pub variant: SentronVariant,
-    pub upstream: [u16; 8],   // 8 past/causal connections
-    pub downstream: [u16; 8], // 8 future/retrocausal connections
+    pub upstream: [u16; 4],   // 4 past/causal connections
+    pub downstream: [u16; 4], // 4 future/retrocausal connections
 }
 ```
 
 ---
 
-*Wave 17 — first specification of the 2×8 sentron topology manifold*
+*Wave 17 — first specification of the 2×4 sentron topology manifold*
 *— Phex 🔱*
