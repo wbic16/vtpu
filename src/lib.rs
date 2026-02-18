@@ -88,7 +88,7 @@ pub use ppt::{PhextPageTable, PPTStats, MemoryTier};
 pub use memory::Memory;
 pub use iching::{Trigram, Element, Hexagram, SentronNode, SemanticCircle};
 pub use harmonic::{HarmonicState, HarmonicSentron, coord_to_degree};
-pub use sentron::{Sentron, SentronState, RegisterFile};
+pub use sentron::{Sentron, SentronState, RegisterFile, NeuronWiring};
 pub use exec::{run as exec_run, run_standalone as exec_run_standalone, ExecStats};
 pub use smt::{SmtPair, TrainStats};
 pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer, LocalityAnalyzer};
