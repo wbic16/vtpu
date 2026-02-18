@@ -57,6 +57,30 @@ pub enum DenseOp {
     DNOP,
 }
 
+impl DenseOp {
+    /// OctaWire: return the op-family index (0-3) for indexed dispatch.
+    ///
+    /// 4 families (the "4 connections" in 2×4 wiring per pipe-neuron):
+    ///   0 = Arithmetic  (DADD, DSUB, DMUL, DFMA, DCMP, DSEL, DMOV)
+    ///   1 = Reduce      (DRED)
+    ///   2 = HDC         (DHDENC, DHDBIND, DHDBUND, DHDPERM, DHDSIM)
+    ///   3 = Ternary     (DTERNARY, DTPOP, DTACC)
+    ///   4 = NOP sentinel (skip dispatch)
+    #[inline(always)]
+    pub fn op_family(&self) -> u8 {
+        match self {
+            DenseOp::DADD { .. } | DenseOp::DSUB { .. } | DenseOp::DMUL { .. }
+            | DenseOp::DFMA { .. } | DenseOp::DCMP { .. }
+            | DenseOp::DSEL { .. } | DenseOp::DMOV { .. } => 0,
+            DenseOp::DRED { .. } => 1,
+            DenseOp::DHDENC { .. } | DenseOp::DHDBIND { .. } | DenseOp::DHDBUND { .. }
+            | DenseOp::DHDPERM { .. } | DenseOp::DHDSIM { .. } => 2,
+            DenseOp::DTERNARY { .. } | DenseOp::DTPOP { .. } | DenseOp::DTACC { .. } => 3,
+            DenseOp::DNOP => 4,
+        }
+    }
+}
+
 /// Sparse Pipeline Operations (Memory/phext addressing)
 ///
 /// Maps to Zen 4 AGU + Load/Store units.
@@ -99,6 +123,28 @@ pub enum SparseOp {
     SNOP,
 }
 
+impl SparseOp {
+    /// OctaWire: return the op-family index (0-3) for indexed dispatch.
+    ///
+    /// 4 families (the "4 connections" in 2×4 wiring per pipe-neuron):
+    ///   0 = Load    (SGATHER, SDEDUP)
+    ///   1 = Store   (SSCATTR, SFLUSH)
+    ///   2 = Address (SINDEX, SALLOC, SFREE)
+    ///   3 = Route   (SPREFCH, SASSOC, SROUTE, SNEIGHBR)
+    ///   4 = NOP sentinel (skip dispatch)
+    #[inline(always)]
+    pub fn op_family(&self) -> u8 {
+        match self {
+            SparseOp::SGATHER { .. } | SparseOp::SDEDUP { .. } => 0,
+            SparseOp::SSCATTR { .. } | SparseOp::SFLUSH { .. } => 1,
+            SparseOp::SINDEX { .. } | SparseOp::SALLOC { .. } | SparseOp::SFREE { .. } => 2,
+            SparseOp::SPREFCH { .. } | SparseOp::SASSOC { .. }
+            | SparseOp::SROUTE { .. } | SparseOp::SNEIGHBR { .. } => 3,
+            SparseOp::SNOP => 4,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MatchMode { First, All, Nearest, Count }
 
@@ -137,6 +183,29 @@ pub enum CoordOp {
     CFANOUT { msg_reg: u8, coord_pattern: u8 },
     CMERGE { rd: u8, group: u8, op: MergeOp },
     CNOP,
+}
+
+impl CoordOp {
+    /// OctaWire: return the op-family index (0-3) for indexed dispatch.
+    ///
+    /// 4 families (the "4 connections" in 2×4 wiring per pipe-neuron):
+    ///   0 = Pack    (CPACK)
+    ///   1 = Send    (CSEND, CRECV, CROUTE, CFANOUT)
+    ///   2 = Barrier (CBAR, CFENCE)
+    ///   3 = Reduce  (CREDUCE, CCAST, CSLICE, CMERGE)
+    ///   4 = NOP sentinel (skip dispatch)
+    #[inline(always)]
+    pub fn op_family(&self) -> u8 {
+        match self {
+            CoordOp::CPACK { .. } => 0,
+            CoordOp::CSEND { .. } | CoordOp::CRECV { .. }
+            | CoordOp::CROUTE { .. } | CoordOp::CFANOUT { .. } => 1,
+            CoordOp::CBAR { .. } | CoordOp::CFENCE { .. } => 2,
+            CoordOp::CREDUCE { .. } | CoordOp::CCAST { .. }
+            | CoordOp::CSLICE { .. } | CoordOp::CMERGE { .. } => 3,
+            CoordOp::CNOP => 4,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

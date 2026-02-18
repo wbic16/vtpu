@@ -304,6 +304,296 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
     active
 }
 
+/// OctaWire dispatch: execute one SIW via indexed family dispatch.
+///
+/// Replaces triple match statements with 3 array lookups + 3 indirect calls.
+/// LLVM sees simple u8 indexing → can generate jump tables + vectorize.
+///
+/// 2×4 wiring: each pipe-neuron has 4 op-families × 2 directions = 8 wires.
+/// Pre-filled d_fam/s_fam/c_fam fields eliminate runtime op classification.
+#[inline(always)]
+pub fn exec_siw_octawire(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
+    let mut active = 0u8;
+
+    // D-Pipe: 4-family indexed dispatch (family 4 = NOP, skip)
+    if siw.d_fam < 4 {
+        active += exec_d_family(sentron, siw);
+    }
+
+    // S-Pipe: 4-family indexed dispatch
+    if siw.s_fam < 4 {
+        active += exec_s_family(sentron, siw, mem);
+    }
+
+    // C-Pipe: 4-family indexed dispatch
+    if siw.c_fam < 4 {
+        active += exec_c_family(sentron, siw);
+    }
+
+    active
+}
+
+#[inline(always)]
+fn exec_d_family(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    match siw.d_fam {
+        0 => exec_d_arithmetic(sentron, siw),
+        1 => exec_d_reduce(sentron, siw),
+        2 => exec_d_hdc(sentron, siw),
+        3 => exec_d_ternary(sentron, siw),
+        _ => 0,
+    }
+}
+
+#[inline(always)]
+fn exec_s_family(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
+    match siw.s_fam {
+        0 => exec_s_load(sentron, siw, mem),
+        1 => exec_s_store(sentron, siw, mem),
+        2 => exec_s_address(sentron, siw),
+        3 => exec_s_route(sentron, siw),
+        _ => 0,
+    }
+}
+
+#[inline(always)]
+fn exec_c_family(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    match siw.c_fam {
+        0 => exec_c_pack(sentron, siw),
+        1 => exec_c_send(sentron, siw),
+        2 => exec_c_barrier(sentron, siw),
+        3 => exec_c_reduce(sentron, siw),
+        _ => 0,
+    }
+}
+
+// ── D-Pipe Families ──────────────────────────────────────────────────────────
+
+#[inline(always)]
+fn exec_d_arithmetic(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    let r = &mut sentron.regs.general;
+    match siw.d_op {
+        DenseOp::DFMA { rd, rs1, rs2, rs3 } => {
+            r[rd as usize] = r[rs1 as usize].wrapping_mul(r[rs2 as usize]).wrapping_add(r[rs3 as usize]);
+        }
+        DenseOp::DADD { rd, rs1, rs2 } => {
+            r[rd as usize] = r[rs1 as usize].wrapping_add(r[rs2 as usize]);
+        }
+        DenseOp::DSUB { rd, rs1, rs2 } => {
+            r[rd as usize] = r[rs1 as usize].wrapping_sub(r[rs2 as usize]);
+        }
+        DenseOp::DMUL { rd, rs1, rs2 } => {
+            r[rd as usize] = r[rs1 as usize].wrapping_mul(r[rs2 as usize]);
+        }
+        DenseOp::DCMP { rd, rs1, rs2 } => {
+            r[rd as usize] = (r[rs1 as usize] - r[rs2 as usize]).signum();
+        }
+        DenseOp::DSEL { rd, rs1, rs2, flags } => {
+            r[rd as usize] = if flags != 0 { r[rs1 as usize] } else { r[rs2 as usize] };
+        }
+        DenseOp::DMOV { rd, imm } => {
+            r[rd as usize] = imm;
+        }
+        _ => {}
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_d_reduce(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    let r = &mut sentron.regs.general;
+    if let DenseOp::DRED { rd, rs1, op } = siw.d_op {
+        let val = r[rs1 as usize];
+        r[rd as usize] = match op {
+            ReductionOp::Sum => val,
+            ReductionOp::Max => val,
+            ReductionOp::Min => val,
+            ReductionOp::And => val & 0xFF,
+            ReductionOp::Or  => val | 0x01,
+            ReductionOp::Xor => val ^ val.rotate_right(16),
+        };
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_d_hdc(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    let r = &mut sentron.regs.general;
+    match siw.d_op {
+        DenseOp::DHDENC { rd, rs, width } => {
+            let val = r[rs as usize];
+            r[rd as usize] = val.rotate_left(width as u32 % 64);
+        }
+        DenseOp::DHDBIND { rd, rs1, rs2 } => {
+            r[rd as usize] = r[rs1 as usize] ^ r[rs2 as usize];
+        }
+        DenseOp::DHDBUND { rd, rs1, rs2 } => {
+            r[rd as usize] = r[rs1 as usize].wrapping_add(r[rs2 as usize]);
+        }
+        DenseOp::DHDPERM { rd, rs, k } => {
+            r[rd as usize] = r[rs as usize].rotate_left(k as u32 % 64);
+        }
+        DenseOp::DHDSIM { rd, rs1, rs2 } => {
+            let xor = r[rs1 as usize] ^ r[rs2 as usize];
+            r[rd as usize] = 64 - xor.count_ones() as i64;
+        }
+        _ => {}
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_d_ternary(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    let r = &mut sentron.regs.general;
+    match siw.d_op {
+        DenseOp::DTERNARY { rd, rs1, trit_reg } => {
+            let trits = r[trit_reg as usize] as u64;
+            r[rd as usize] = ternary_apply(r[rs1 as usize], trits);
+        }
+        DenseOp::DTPOP { rd, rs } => {
+            let trits = r[rs as usize] as u64;
+            let mut count = 0i64;
+            for i in 0..32 {
+                if (trits >> (i * 2)) & 0x3 != 0 { count += 1; }
+            }
+            r[rd as usize] = count;
+        }
+        DenseOp::DTACC { rd, rs1, trit_reg } => {
+            let trits = r[trit_reg as usize] as u64;
+            r[rd as usize] = r[rd as usize].wrapping_add(ternary_apply(r[rs1 as usize], trits));
+        }
+        _ => {}
+    }
+    1
+}
+
+// ── S-Pipe Families ──────────────────────────────────────────────────────────
+
+#[inline(always)]
+fn exec_s_load(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
+    match siw.s_op {
+        SparseOp::SGATHER { rd, coord_idx, .. } => {
+            let coord = sentron.regs.phext[coord_idx as usize].clone();
+            sentron.regs.general[rd as usize] = mem.gather_i64(&coord);
+        }
+        SparseOp::SDEDUP { rd, rs, .. } => {
+            sentron.regs.general[rd as usize] = sentron.regs.general[rs as usize];
+        }
+        _ => {}
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_s_store(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
+    match siw.s_op {
+        SparseOp::SSCATTR { coord_idx, rs, .. } => {
+            let coord = sentron.regs.phext[coord_idx as usize].clone();
+            let val = sentron.regs.general[rs as usize];
+            mem.scatter_i64(&coord, val);
+        }
+        SparseOp::SFLUSH { .. } => {}
+        _ => {}
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_s_address(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    match siw.s_op {
+        SparseOp::SINDEX { rd, base, offset, dim } => {
+            let mut coord = sentron.regs.phext[base as usize].clone();
+            let old_val = coord.get_dim(dim) as i32;
+            let new_val = old_val.wrapping_add(offset).max(0) as u16;
+            coord.set_dim(dim, new_val);
+            sentron.regs.general[rd as usize] = new_val as i64;
+            sentron.regs.phext[rd as usize % 8] = coord;
+        }
+        SparseOp::SALLOC { rd, .. } => {
+            sentron.regs.general[rd as usize] = 1;
+        }
+        SparseOp::SFREE { .. } => {}
+        _ => {}
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_s_route(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    match siw.s_op {
+        SparseOp::SPREFCH { .. } => {}
+        SparseOp::SASSOC { rd, .. } => {
+            sentron.regs.general[rd as usize] = 0;
+        }
+        SparseOp::SROUTE { rd, .. } => {
+            sentron.regs.general[rd as usize] = 0;
+        }
+        SparseOp::SNEIGHBR { rd, .. } => {
+            sentron.regs.general[rd as usize] = 0;
+        }
+        _ => {}
+    }
+    1
+}
+
+// ── C-Pipe Families ──────────────────────────────────────────────────────────
+
+#[inline(always)]
+fn exec_c_pack(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    if let CoordOp::CPACK { rd, rs1, rs2, .. } = siw.c_op {
+        let hi = (sentron.regs.general[rs1 as usize] as u64) << 32;
+        let lo = sentron.regs.general[rs2 as usize] as u64 & 0xFFFF_FFFF;
+        let packed = (hi | lo) as i64;
+        for byte_idx in 0..8 {
+            sentron.regs.message[rd as usize % 4][byte_idx] = ((packed >> (byte_idx * 8)) & 0xFF) as u8;
+        }
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_c_send(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    match siw.c_op {
+        CoordOp::CRECV { rd, .. } => {
+            if let Some((_, val)) = sentron.inbox.first().cloned() {
+                sentron.regs.general[rd as usize] = val;
+                sentron.inbox.remove(0);
+            }
+        }
+        CoordOp::CSEND { .. } | CoordOp::CROUTE { .. } | CoordOp::CFANOUT { .. } => {}
+        _ => {}
+    }
+    1
+}
+
+#[inline(always)]
+fn exec_c_barrier(_sentron: &mut Sentron, _siw: &SIW) -> u8 {
+    // CBAR and CFENCE are coordination points — no register mutation
+    1
+}
+
+#[inline(always)]
+fn exec_c_reduce(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    match siw.c_op {
+        CoordOp::CREDUCE { rd, rs, op, .. } => {
+            let val = sentron.regs.general[rs as usize];
+            sentron.regs.general[rd as usize] = match op {
+                ReductionOp::Sum => val,
+                ReductionOp::Max => val,
+                ReductionOp::Min => val,
+                ReductionOp::And => val & 0xFF,
+                ReductionOp::Or  => val | 0x01,
+                ReductionOp::Xor => val ^ val.rotate_right(16),
+            };
+        }
+        CoordOp::CCAST { .. } | CoordOp::CSLICE { .. } => {}
+        CoordOp::CMERGE { rd, .. } => {
+            sentron.regs.general[rd as usize] = 0;
+        }
+        _ => {}
+    }
+    1
+}
+
 /// Run a sentron to completion with PPT-backed memory, returning execution statistics.
 pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
     let mut stats = ExecStats::default();

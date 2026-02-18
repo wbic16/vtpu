@@ -55,11 +55,13 @@ pub fn encode_coord_fast(dims: &[u16; 11]) -> HyperVector {
         let dim_basis = &cache.dim_basis[i];
         
         // Use cached basis if value is in range, else compute
+        let fallback;
         let val_basis = if (val as usize) < cache.val_basis.len() {
             &cache.val_basis[val as usize]
         } else {
-            // Fallback for large values (rare)
-            &HyperVector::basis(100 + val as usize, HDC_DEFAULT_WIDTH)
+            // Fallback for large values (rare) — bind lifetime to local
+            fallback = HyperVector::basis(100 + val as usize, HDC_DEFAULT_WIDTH);
+            &fallback
         };
         
         // Bind dimension with value and accumulate

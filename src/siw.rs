@@ -41,17 +41,36 @@ pub struct SIW {
     /// - 5: C-Pipe depends on prior D-Pipe
     /// - 6-7: Reserved
     pub deps: u8,
+
+    /// OctaWire dispatch family bytes (precomputed at SIW construction).
+    ///
+    /// 2×4 wiring per pipe-neuron: 4 op families × 2 directions = 8 wires.
+    /// These bytes allow O(1) indexed dispatch, replacing triple match statements.
+    /// Value 4 = NOP sentinel (skip dispatch entirely).
+    ///
+    /// d_fam: DenseOp family  (0=Arithmetic, 1=Reduce, 2=HDC, 3=Ternary, 4=NOP)
+    /// s_fam: SparseOp family (0=Load, 1=Store, 2=Address, 3=Route, 4=NOP)
+    /// c_fam: CoordOp family  (0=Pack, 1=Send, 2=Barrier, 3=Reduce, 4=NOP)
+    pub d_fam: u8,
+    pub s_fam: u8,
+    pub c_fam: u8,
 }
 
 impl SIW {
     /// Create a new SIW with no dependencies
     pub fn new(d_op: DenseOp, s_op: SparseOp, c_op: CoordOp, phext_addr: PhextCoord) -> Self {
+        let d_fam = d_op.op_family();
+        let s_fam = s_op.op_family();
+        let c_fam = c_op.op_family();
         Self {
             d_op,
             s_op,
             c_op,
             phext_addr,
             deps: 0,
+            d_fam,
+            s_fam,
+            c_fam,
         }
     }
     
@@ -63,7 +82,19 @@ impl SIW {
             c_op: CoordOp::CNOP,
             phext_addr: PhextCoord::zero(),
             deps: 0,
+            d_fam: 4,
+            s_fam: 4,
+            c_fam: 4,
         }
+    }
+
+    /// OctaWire mode byte: 3-bit encoding of active pipes.
+    /// bit 0: D active, bit 1: S active, bit 2: C active
+    #[inline(always)]
+    pub fn mode_bits(&self) -> u8 {
+        ((self.d_fam < 4) as u8)
+            | (((self.s_fam < 4) as u8) << 1)
+            | (((self.c_fam < 4) as u8) << 2)
     }
     
     /// Set dependency flags
