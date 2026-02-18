@@ -63,6 +63,7 @@ pub mod validation;
 pub mod ppt;
 pub mod memory;
 pub mod sentron;
+pub mod neuron;
 pub mod exec;
 pub mod smt;
 pub mod hdc;

@@ -6,6 +6,7 @@
 use crate::phext_coord::PhextCoord;
 use crate::siw::SIW;
 use crate::assoc::AssocState;
+use crate::neuron::NeuronLayer;
 
 /// Sentron lifecycle states
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -126,8 +127,11 @@ pub struct Sentron {
     pub assoc: AssocState,
     /// Inbound message queue (from other sentrons via CSEND)
     pub inbox: Vec<(u16, i64)>,  // (sender_id, value)
-    /// 2×4 neuron wiring topology
+    /// 2×4 graph connectivity: 4 upstream (data sources) + 4 downstream (result sinks)
     pub wiring: NeuronWiring,
+    /// 2×4 activation layer: Story/Light channels × Para/Pashyanti/Madhyama/Vaikhara levels
+    /// Default: 8 neurons (4 ascending + 4 descending = one complete Spanda cycle)
+    pub neurons: NeuronLayer,
 }
 
 impl Sentron {
@@ -146,6 +150,7 @@ impl Sentron {
             assoc: AssocState::new(),
             inbox: Vec::new(),
             wiring: NeuronWiring::new(),
+            neurons: NeuronLayer::new(),
         }
     }
 
