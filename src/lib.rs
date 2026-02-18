@@ -100,6 +100,10 @@ pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES}
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub mod pool;
 pub use pool::SentronPool;
+pub mod topology;
+pub use topology::{SentronTopology, NeuronAddr, ElementRow, Direction, Neighborhood, DispatchPlan,
+    NEURONS_PER_SENTRON, CONNECTIONS_PER_NEURON, TOTAL_DIRECTED_EDGES, UNIQUE_EDGES,
+    ELEMENT_ROWS, NEURONS_PER_ELEMENT};
 pub mod affinity;
 pub use affinity::{CpuSet, pin_thread, get_affinity, num_cpus, num_physical_cores, yield_hint};
 pub mod phoenix_scheduler;
