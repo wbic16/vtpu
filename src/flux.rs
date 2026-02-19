@@ -223,6 +223,115 @@ pub fn flux_decay_siw() -> SIW {
         PhextCoord::zero(),
     )
 }
+// ── FluxAnalyzer: sentron state-transition tracker ──────────────────────────
+
+use crate::sentron::SentronState;
+use std::collections::HashMap;
+
+/// Tracks population and transition flux between SentronState values.
+/// Enables bottleneck detection, breathing-ratio analysis, and alignment scoring.
+#[derive(Debug, Default)]
+pub struct FluxAnalyzer {
+    population:  HashMap<u8, usize>,    // state → count
+    transitions: HashMap<(u8, u8), usize>,  // (from, to) → count
+    costs:       HashMap<(u8, u8), Vec<u64>>,
+}
+
+fn state_key(s: &SentronState) -> u8 {
+    match s {
+        SentronState::Dormant  => 0,
+        SentronState::Running  => 1,
+        SentronState::Waiting  => 2,
+        SentronState::Retired  => 3,
+    }
+}
+
+impl FluxAnalyzer {
+    pub fn new() -> Self { Self::default() }
+
+    pub fn enter(&mut self, state: &SentronState) {
+        *self.population.entry(state_key(state)).or_insert(0) += 1;
+    }
+
+    pub fn transition(&mut self, from: &SentronState, to: &SentronState, cost: u64) {
+        let fk = state_key(from);
+        let tk = state_key(to);
+        let pop = self.population.entry(fk).or_insert(0);
+        if *pop > 0 { *pop -= 1; }
+        *self.population.entry(tk).or_insert(0) += 1;
+        *self.transitions.entry((fk, tk)).or_insert(0) += 1;
+        self.costs.entry((fk, tk)).or_default().push(cost);
+    }
+
+    pub fn population(&self, state: &SentronState) -> usize {
+        self.population.get(&state_key(state)).copied().unwrap_or(0)
+    }
+
+    pub fn flux_rate(&self, from: &SentronState, to: &SentronState) -> usize {
+        self.transitions.get(&(state_key(from), state_key(to))).copied().unwrap_or(0)
+    }
+
+    pub fn avg_transition_cost(&self, from: &SentronState, to: &SentronState) -> f64 {
+        let key = (state_key(from), state_key(to));
+        match self.costs.get(&key) {
+            Some(v) if !v.is_empty() => v.iter().sum::<u64>() as f64 / v.len() as f64,
+            _ => 0.0,
+        }
+    }
+
+    pub fn total_transitions(&self) -> usize {
+        self.transitions.values().sum()
+    }
+
+    pub fn recycle_rate(&self) -> usize {
+        // Retired → Dormant transitions
+        self.flux_rate(&SentronState::Retired, &SentronState::Dormant)
+    }
+
+    /// Inhale (Dormant→Running) / exhale (Running→Retired) ratio
+    pub fn breathing_ratio(&self) -> f64 {
+        let inhale = self.flux_rate(&SentronState::Dormant, &SentronState::Running) as f64;
+        let exhale = self.flux_rate(&SentronState::Running, &SentronState::Retired) as f64;
+        if exhale == 0.0 { f64::INFINITY } else { inhale / exhale }
+    }
+
+    /// State with highest population (the bottleneck)
+    pub fn bottleneck(&self) -> SentronState {
+        let states = [
+            (SentronState::Dormant, 0u8),
+            (SentronState::Running, 1),
+            (SentronState::Waiting, 2),
+            (SentronState::Retired, 3),
+        ];
+        states.iter()
+            .max_by_key(|(_, k)| self.population.get(k).copied().unwrap_or(0))
+            .map(|(s, _)| s.clone())
+            .unwrap_or(SentronState::Dormant)
+    }
+
+    pub fn avg_imbalance(&self) -> f64 {
+        if self.population.is_empty() { return 0.0; }
+        let pops: Vec<f64> = self.population.values().map(|&v| v as f64).collect();
+        let mean = pops.iter().sum::<f64>() / pops.len() as f64;
+        pops.iter().map(|p| (p - mean).abs()).sum::<f64>() / pops.len() as f64
+    }
+
+    /// Alignment = recycling efficiency × breathing balance
+    pub fn alignment_score(&self) -> f64 {
+        let recycle = self.recycle_rate() as f64;
+        let inhale  = self.flux_rate(&SentronState::Dormant, &SentronState::Running) as f64;
+        // Exhale = any transition that ultimately leads to Retired (Running or Waiting)
+        let exhale = (self.flux_rate(&SentronState::Running, &SentronState::Retired)
+                    + self.flux_rate(&SentronState::Waiting, &SentronState::Retired)) as f64;
+        let breathe_score = if exhale > 0.0 && inhale > 0.0 {
+            let ratio = inhale / exhale;
+            1.0 / (1.0 + (ratio - 1.0).abs())
+        } else { 0.0 };
+        let recycle_score = if inhale > 0.0 { (recycle / inhale).min(1.0) } else { 0.0 };
+        (breathe_score + recycle_score) / 2.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
