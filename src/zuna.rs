@@ -121,7 +121,7 @@ pub fn topology_reconstruction(
     band: FreqBand,
 ) -> Vec<SIW> {
     use crate::topology::NEURONS_PER_ELEMENT;
-    use crate::topology::ELEMENT_ROWS;
+    
 
     let band_row = band.wuxing_row();
     let mut siws = Vec::new();
