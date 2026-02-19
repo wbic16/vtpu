@@ -117,3 +117,4 @@ pub mod integration;
 pub mod assoc;
 pub mod cpu_sched;
 pub mod redux;
+pub mod sysfs;

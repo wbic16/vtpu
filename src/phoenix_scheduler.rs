@@ -17,6 +17,7 @@
 
 use std::collections::HashMap;
 use std::time::Instant;
+use crate::sysfs::{read_thermal, score_thermal_opt};
 
 /// Sentron performance metrics
 #[derive(Debug, Clone)]
@@ -136,7 +137,7 @@ impl NineColorDecision {
             cache_locality: Self::score_cache_locality(sentron),
             numa_locality: 1.0, // TODO: Implement NUMA detection
             temporal_trend: Self::score_temporal_trend(history),
-            thermal_delta: 1.0, // TODO: Read /sys/class/thermal/
+            thermal_delta: score_thermal_opt(read_thermal()), // 🟤 W20: Live sysfs
             power_efficiency: 1.0, // TODO: Read /sys/class/powercap/
             cluster_balance: 1.0, // TODO: Multi-node coordination
         }
