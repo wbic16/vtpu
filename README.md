@@ -10,12 +10,12 @@ A software-defined accelerator with sentron-native instruction scheduling and ph
 |-------|-------|--------|
 | A — Foundation | W1–W5 | ✅ Complete |
 | 0 — Single Core | W6–W12 | ✅ **GATE PASSED** (2.93 ops/cycle avg) |
-| 1 — SMT | W13–W18 | 🔓 In progress |
-| 2 — Cluster | W19–W28 | ⬜ |
+| 1 — SMT | W13–W18 | ✅ **GATE PASSED** (2.84x total) |
+| 2 — Memory Hierarchy | W19–W24 | 🔓 In progress |
 | 3 — Compiler | W29–W35 | ⬜ |
 | 4 — Launch | W36–W40 | ⬜ |
 
-**272 tests. ~10K LOC. Zero deps.**
+**319 tests. ~17K LOC. Zero deps.**
 
 ## Benchmarks (Zen 4 8945HS, release)
 

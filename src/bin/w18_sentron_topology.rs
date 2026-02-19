@@ -20,8 +20,8 @@ use std::sync::mpsc::{self, SyncSender, Receiver};
 use std::thread;
 
 use vtpu_runtime::{
-    SentronTopology, NeuronAddr, ElementRow, DispatchPlan,
-    NEURONS_PER_SENTRON, CONNECTIONS_PER_NEURON, ELEMENT_ROWS, NEURONS_PER_ELEMENT,
+    SentronTopology, NeuronAddr, DispatchPlan,
+    NEURONS_PER_SENTRON, CONNECTIONS_PER_NEURON,
 };
 
 // ── Work unit ──────────────────────────────────────────────────────────────
