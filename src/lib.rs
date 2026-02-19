@@ -100,6 +100,7 @@ pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES}
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub mod pool;
 pub use pool::SentronPool;
+pub mod flux;
 pub mod simd;
 pub mod topology;
 pub mod zuna;
@@ -109,7 +110,6 @@ pub mod cache_sim;
 pub mod eeg_bridge;
 pub mod fleet;
 pub mod context;
-pub mod flux;
 pub use topology::{SentronTopology, NeuronAddr, ElementRow, Direction, Neighborhood, DispatchPlan,
     NEURONS_PER_SENTRON, CONNECTIONS_PER_NEURON, TOTAL_DIRECTED_EDGES, UNIQUE_EDGES,
     ELEMENT_ROWS, NEURONS_PER_ELEMENT};

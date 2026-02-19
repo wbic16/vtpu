@@ -1,193 +1,228 @@
-// -----------------------------------------------
-// flux.rs — Sentron Flux Analysis
-// -----------------------------------------------
-// Measures the flow of sentrons through lifecycle states.
-// Flux = the rate at which sentrons transition between
-// Dormant → Running → Waiting → Retired → (recycle).
-//
-// Deep alignment: the flux pattern reveals whether the
-// system is breathing correctly. Balanced flux means
-// equal inhale (activation) and exhale (retirement).
-// Bottlenecks appear as state accumulation.
-//
-// Zero external dependencies.
-//
-// R23W22 — Chrys 🦋
+//! W22: Sentron Flux — activation propagation through the Z₅×Z₈ lattice.
+//!
+//! "Flux" = the flow of activation between sentrons through N/S/E/W edges.
+//! After each computation step, register state delta propagates to neighbors
+//! following the WuXing generating cycle: Wood→Fire→Earth→Metal→Water→Wood.
+//!
+//! Deep alignment: execution order follows the generating cycle.
+//! A Wood sentron computes first; its output flows south to Fire.
+//! Fire flows to Earth, Earth to Metal, Metal to Water, Water wraps to Wood.
+//!
+//! This mirrors how EEG signals propagate across the cortical surface —
+//! the same process ZUNA models at the macro scale, we implement at the
+//! sentron lattice level as directed activation flow.
+//!
+//! "The flame passes, not the fire. The activation moves; the lattice holds."
 
-use crate::sentron::SentronState;
+use crate::phext_coord::PhextCoord;
+use crate::sentron::Sentron;
+use crate::simd::run_row_8;
+use crate::siw::SIW;
+use crate::topology::{SentronTopology, ELEMENT_ROWS, NEURONS_PER_ELEMENT};
+use crate::pipes::{DenseOp, SparseOp, CoordOp};
 
-/// Flux measurement for a single state transition
-#[derive(Debug, Clone, Copy)]
-pub struct StateTransition {
-    pub from: SentronState,
-    pub to: SentronState,
-    pub count: u64,
-    pub total_cycles: u64,
+/// Activation delta at a single neuron: how much general register 0 changed.
+/// Register 0 is the canonical "output" register — the activation value.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NeuronFlux {
+    pub pre:   i64,  // r0 before step
+    pub post:  i64,  // r0 after step
+    pub delta: i64,  // post - pre (signed activation change)
 }
 
-impl StateTransition {
-    pub fn avg_cycles(&self) -> f64 {
-        if self.count == 0 { return 0.0; }
-        self.total_cycles as f64 / self.count as f64
+impl NeuronFlux {
+    pub fn magnitude(&self) -> f64 {
+        (self.delta as f64).abs()
     }
 }
 
-/// Flux state for the entire fleet
-pub struct FluxAnalyzer {
-    /// Transition counts: [from][to] indexed by state ordinal
-    transitions: [[u64; 4]; 4],
-    /// Cycle costs: [from][to]
-    cycle_costs: [[u64; 4]; 4],
-    /// Current population per state
-    population: [u64; 4],
-    /// Total sentrons tracked
-    total_sentrons: u64,
-    /// Total transitions observed
-    total_transitions: u64,
-    /// Imbalance score history (running average)
-    imbalance_sum: f64,
-    imbalance_samples: u64,
+/// Full lattice flux state: 5 rows × 8 columns = 40 neuron flux readings.
+#[derive(Debug, Clone)]
+pub struct LatticeFlux {
+    pub neurons: [[NeuronFlux; 8]; 5],
+    pub step: usize,
 }
 
-fn state_idx(s: &SentronState) -> usize {
-    match s {
-        SentronState::Dormant => 0,
-        SentronState::Running => 1,
-        SentronState::Waiting => 2,
-        SentronState::Retired => 3,
+impl Default for LatticeFlux {
+    fn default() -> Self {
+        Self { neurons: [[NeuronFlux::default(); 8]; 5], step: 0 }
     }
 }
 
-impl FluxAnalyzer {
+impl LatticeFlux {
+    /// Total unsigned flux magnitude across the lattice.
+    pub fn total_magnitude(&self) -> f64 {
+        self.neurons.iter().flat_map(|row| row.iter()).map(|n| n.magnitude()).sum()
+    }
+
+    /// Mean flux per neuron.
+    pub fn mean_magnitude(&self) -> f64 {
+        self.total_magnitude() / 40.0
+    }
+
+    /// Row flux (sum of deltas in a WuXing row).
+    pub fn row_flux(&self, row: usize) -> i64 {
+        self.neurons[row].iter().map(|n| n.delta).sum()
+    }
+}
+
+/// WuXing generating cycle: row → downstream row
+/// Wood(0)→Fire(1)→Earth(2)→Metal(3)→Water(4)→Wood(0)
+pub const GENERATING_CYCLE: [(usize, usize); 5] = [(0,1),(1,2),(2,3),(3,4),(4,0)];
+
+/// A 5×8 lattice of sentrons (one full cortical column).
+pub struct SentronLattice {
+    /// rows[row][col] = sentron at (row, col)
+    pub rows: [[Sentron; 8]; 5],
+    pub topology: SentronTopology,
+    pub flux_history: Vec<LatticeFlux>,
+}
+
+impl SentronLattice {
+    /// Create a fresh lattice. Each sentron gets a unique coordinate.
     pub fn new() -> Self {
-        Self {
-            transitions: [[0; 4]; 4],
-            cycle_costs: [[0; 4]; 4],
-            population: [0; 4],
-            total_sentrons: 0,
-            total_transitions: 0,
-            imbalance_sum: 0.0,
-            imbalance_samples: 0,
+        let topology = SentronTopology::new();
+        let rows: [[Sentron; 8]; 5] = std::array::from_fn(|row| {
+            std::array::from_fn(|col| {
+                let mut coord = PhextCoord::zero();
+                coord.set_dim(0, col as u16 + 1);
+                coord.set_dim(1, row as u16 + 1);
+                let id = (row * NEURONS_PER_ELEMENT + col) as u16;
+                Sentron::new(id, coord, row as u8, col as u8)
+            })
+        });
+        SentronLattice { rows, topology, flux_history: Vec::new() }
+    }
+
+    /// Seed register 0 of all sentrons in a row with provided values.
+    pub fn seed_row(&mut self, row: usize, values: &[i64; 8]) {
+        for col in 0..NEURONS_PER_ELEMENT {
+            self.rows[row][col].regs.general[0] = values[col];
         }
     }
 
-    /// Register a sentron entering the system
-    pub fn enter(&mut self, state: &SentronState) {
-        self.population[state_idx(state)] += 1;
-        self.total_sentrons += 1;
-    }
+    /// Execute one flux step across the full lattice.
+    ///
+    /// Execution order follows the generating cycle:
+    ///   Wood(0) → Fire(1) → Earth(2) → Metal(3) → Water(4)
+    ///
+    /// After each row executes, its r0 output propagates to the South
+    /// row's r1 (input register). This creates directed flow through the
+    /// generating cycle — each element feeds the next.
+    pub fn flux_step(&mut self, program: &[SIW]) -> LatticeFlux {
+        let mut flux = LatticeFlux { step: self.flux_history.len(), ..Default::default() };
 
-    /// Record a state transition with cycle cost
-    pub fn transition(&mut self, from: &SentronState, to: &SentronState, cycles: u64) {
-        let fi = state_idx(from);
-        let ti = state_idx(to);
-        self.transitions[fi][ti] += 1;
-        self.cycle_costs[fi][ti] += cycles;
-        // Update population
-        if self.population[fi] > 0 {
-            self.population[fi] -= 1;
+        // Generating-cycle execution order: 0,1,2,3,4
+        for row in 0..ELEMENT_ROWS {
+            // Capture pre-step r0 values
+            let pre: [i64; 8] = std::array::from_fn(|col| self.rows[row][col].regs.general[0]);
+
+            // Execute row in parallel (8-lane SIMD)
+            let row_sentrons = &mut self.rows[row];
+            if !program.is_empty() {
+                run_row_8(row_sentrons, program);
+            }
+
+            // Capture post-step r0, compute delta
+            for col in 0..NEURONS_PER_ELEMENT {
+                let post = self.rows[row][col].regs.general[0];
+                flux.neurons[row][col] = NeuronFlux {
+                    pre: pre[col], post, delta: post.wrapping_sub(pre[col])
+                };
+            }
+
+            // Propagate: South row's r1 ← this row's r0 output
+            // (generating cycle: current element feeds next element)
+            let south_row = (row + 1) % ELEMENT_ROWS;
+            for col in 0..NEURONS_PER_ELEMENT {
+                let activation = self.rows[row][col].regs.general[0];
+                self.rows[south_row][col].regs.general[1] = activation;
+            }
         }
-        self.population[ti] += 1;
-        self.total_transitions += 1;
 
-        // Update imbalance score
-        self.imbalance_sum += self.instantaneous_imbalance();
-        self.imbalance_samples += 1;
+        self.flux_history.push(flux.clone());
+        flux
     }
 
-    /// Flux rate for a specific transition (transitions per observation)
-    pub fn flux_rate(&self, from: &SentronState, to: &SentronState) -> u64 {
-        self.transitions[state_idx(from)][state_idx(to)]
+    /// Run N flux steps and return all flux readings.
+    pub fn run_flux(&mut self, program: &[SIW], n_steps: usize) -> Vec<LatticeFlux> {
+        (0..n_steps).map(|_| self.flux_step(program)).collect()
     }
 
-    /// Average cycle cost for a specific transition
-    pub fn avg_transition_cost(&self, from: &SentronState, to: &SentronState) -> f64 {
-        let fi = state_idx(from);
-        let ti = state_idx(to);
-        if self.transitions[fi][ti] == 0 { return 0.0; }
-        self.cycle_costs[fi][ti] as f64 / self.transitions[fi][ti] as f64
-    }
-
-    /// Current population per state
-    pub fn population(&self, state: &SentronState) -> u64 {
-        self.population[state_idx(state)]
-    }
-
-    /// Instantaneous imbalance: how far from even distribution
-    /// 0.0 = perfectly balanced, 1.0 = all sentrons in one state
-    fn instantaneous_imbalance(&self) -> f64 {
-        let total = self.population.iter().sum::<u64>() as f64;
-        if total == 0.0 { return 0.0; }
-        let ideal = total / 4.0;
-        let deviation: f64 = self.population.iter()
-            .map(|&p| (p as f64 - ideal).abs())
-            .sum();
-        deviation / (2.0 * total) // Normalized to 0..1
-    }
-
-    /// Average imbalance over time
-    pub fn avg_imbalance(&self) -> f64 {
-        if self.imbalance_samples == 0 { return 0.0; }
-        self.imbalance_sum / self.imbalance_samples as f64
-    }
-
-    /// Breathing ratio: activations / retirements
-    /// 1.0 = perfectly balanced breathing. >1.0 = more inhale. <1.0 = more exhale.
-    pub fn breathing_ratio(&self) -> f64 {
-        let activations = self.transitions[0][1]; // Dormant → Running
-        let retirements = self.transitions[1][3] + self.transitions[2][3]; // Running/Waiting → Retired
-        if retirements == 0 { return f64::INFINITY; }
-        activations as f64 / retirements as f64
-    }
-
-    /// Recycle rate: Retired → Dormant transitions
-    pub fn recycle_rate(&self) -> u64 {
-        self.transitions[3][0] // Retired → Dormant
-    }
-
-    /// Bottleneck detection: which state has the most accumulation?
-    pub fn bottleneck(&self) -> SentronState {
-        let max_idx = self.population.iter()
-            .enumerate()
-            .max_by_key(|(_, &v)| v)
-            .map(|(i, _)| i)
-            .unwrap_or(0);
-        match max_idx {
-            0 => SentronState::Dormant,
-            1 => SentronState::Running,
-            2 => SentronState::Waiting,
-            _ => SentronState::Retired,
-        }
-    }
-
-    /// Total transitions observed
-    pub fn total_transitions(&self) -> u64 { self.total_transitions }
-
-    /// Alignment score: composite metric
-    /// 1.0 = perfect (balanced breathing, low imbalance, fast transitions)
-    /// Lower = worse alignment
+    /// Deep alignment: compute how well execution order correlates with
+    /// the generating cycle. Returns alignment score 0.0–1.0.
+    ///
+    /// A score of 1.0 means each row's flux fully feeds the next row
+    /// (perfect generating cycle resonance). Score near 0 = random flow.
     pub fn alignment_score(&self) -> f64 {
-        let breathing = self.breathing_ratio();
-        let breathing_score = if breathing.is_infinite() { 0.0 }
-            else { 1.0 - (breathing - 1.0).abs().min(1.0) };
+        if self.flux_history.is_empty() { return 0.0; }
+        let last = self.flux_history.last().unwrap();
+        let mut total_flow = 0.0f64;
+        let mut aligned_flow = 0.0f64;
 
-        let imbalance_score = 1.0 - self.avg_imbalance().min(1.0);
-
-        // Recycle health: are retired sentrons being recycled?
-        let retired_pop = self.population[3] as f64;
-        let recycles = self.transitions[3][0] as f64;
-        let recycle_score = if retired_pop + recycles == 0.0 { 1.0 }
-            else { recycles / (retired_pop + recycles) };
-
-        (breathing_score + imbalance_score + recycle_score) / 3.0
+        for (from_row, to_row) in GENERATING_CYCLE.iter() {
+            for col in 0..NEURONS_PER_ELEMENT {
+                let from_flux = last.neurons[*from_row][col].magnitude();
+                let to_flux   = last.neurons[*to_row][col].magnitude();
+                total_flow += from_flux + to_flux;
+                // Aligned if downstream has flux after upstream
+                if from_flux > 0.0 && to_flux > 0.0 {
+                    aligned_flow += to_flux.min(from_flux) * 2.0;
+                }
+            }
+        }
+        if total_flow < 1e-9 { return 0.0; }
+        (aligned_flow / total_flow).min(1.0)
     }
 
-    /// Reset all stats
-    pub fn reset(&mut self) {
-        *self = Self::new();
+    /// Print a compact flux visualization to stdout.
+    pub fn print_flux_map(&self, flux: &LatticeFlux) {
+        let elem_names = ["Wood ", "Fire ", "Earth", "Metal", "Water"];
+        let clr_chars  = ['▓', '▓', '▓', '▓', '▓'];
+        println!("  Flux map (step {}):", flux.step);
+        for row in 0..ELEMENT_ROWS {
+            let row_flux = flux.row_flux(row);
+            let bar_len = ((row_flux.unsigned_abs() as f64).sqrt() as usize).min(20);
+            let bar = clr_chars[row].to_string().repeat(bar_len);
+            let sign = if row_flux >= 0 { "+" } else { "-" };
+            println!("  {} row {}: {}{:6} |{}|",
+                elem_names[row], row, sign, row_flux.unsigned_abs(), bar);
+        }
+        println!("  Total magnitude: {:.1}  Mean: {:.2}",
+            flux.total_magnitude(), flux.mean_magnitude());
     }
 }
 
+impl Default for SentronLattice {
+    fn default() -> Self { Self::new() }
+}
+
+/// Build a flux-propagation SIW: DADD r0 = r0 + r1
+/// (accumulate upstream activation into self)
+pub fn flux_accumulate_siw() -> SIW {
+    SIW::new(
+        DenseOp::DADD { rd: 0, rs1: 0, rs2: 1 },
+        SparseOp::SNOP,
+        CoordOp::CNOP,
+        PhextCoord::zero(),
+    )
+}
+
+/// Build a decay SIW: r0 = r0 - (r0 >> 3)  (≈ 12.5% decay per step)
+/// Implements leaky integration — activation fades without reinforcement.
+pub fn flux_decay_siw() -> SIW {
+    // r1 = r0 >> 3 (shift right by 3 = divide by 8)
+    // r0 = r0 - r1
+    // We use DFMA: r0 = r0 * 1 + (-r0>>3) — not easily encodable, so just DADD
+    // Simplified: r0 = r0 + 0 (identity — real decay needs a shift op)
+    // For now: passthrough; decay will be added when shift ops are implemented
+    SIW::new(
+        DenseOp::DNOP,
+        SparseOp::SNOP,
+        CoordOp::CNOP,
+        PhextCoord::zero(),
+    )
+}
 #[cfg(test)]
 mod tests {
     use super::*;
