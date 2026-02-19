@@ -21,6 +21,16 @@ pub struct ExecStats {
     pub d_nops: u64,
     pub s_nops: u64,
     pub c_nops: u64,
+    /// Sentron flux: L1 norm of register-state delta per SIW stream.
+    /// Measures how much the sentron's general register file actually moved.
+    /// High flux = processing novel data; low flux = converging / fixed-point.
+    pub flux_total: f64,
+    /// Vak histogram: how many SIWs retired at each dominant VakLevel.
+    /// Indexed by VakLevel ordinal: [Para, Pashyanti, Madhyama, Vaikhara].
+    /// Para+Pashyanti = Light mode (S-pipe heavy); Madhyama+Vaikhara = Story mode (D-pipe heavy).
+    pub vak_histogram: [u64; 4],
+    /// Total Spanda oscillation cycles accumulated across the NeuronLayer.
+    pub spanda_cycles: u64,
 }
 
 impl ExecStats {
@@ -53,6 +63,34 @@ impl ExecStats {
         let total = self.c_ops + self.c_nops;
         if total == 0 { return 0.0; }
         self.c_ops as f64 / total as f64
+    }
+
+    /// Flux per SIW: average register-state L1-norm change per retired SIW.
+    /// D-heavy streams show high flux (lots of arithmetic). S-heavy streams
+    /// show lower flux (coordinate operations, less register churn).
+    pub fn flux_per_siw(&self) -> f64 {
+        if self.siws_retired == 0 { return 0.0; }
+        self.flux_total / self.siws_retired as f64
+    }
+
+    /// Dominant vak level across the stream (most common NeuronLayer output).
+    pub fn dominant_vak(&self) -> &'static str {
+        let names = ["Para", "Pashyanti", "Madhyama", "Vaikhara"];
+        let max_idx = self.vak_histogram
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, &v)| v)
+            .map(|(i, _)| i)
+            .unwrap_or(3);
+        names[max_idx]
+    }
+
+    /// Light-mode fraction: Para + Pashyanti SIWs / total.
+    /// > 0.5 means S-pipe (sparse/associative) was dominant.
+    pub fn light_fraction(&self) -> f64 {
+        if self.siws_retired == 0 { return 0.0; }
+        let light = self.vak_histogram[0] + self.vak_histogram[1];
+        light as f64 / self.siws_retired as f64
     }
 }
 
@@ -670,16 +708,47 @@ pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
     let program = std::mem::take(&mut sentron.program);
 
     for siw in &program {
-        if siw.d_fam == 4 { stats.d_nops += 1; } else { stats.d_ops += 1; }
-        if siw.s_fam == 4 { stats.s_nops += 1; } else { stats.s_ops += 1; }
-        if siw.c_fam == 4 { stats.c_nops += 1; } else { stats.c_ops += 1; }
+        let d_active = siw.d_fam < 4;
+        let s_active = siw.s_fam < 4;
+        let c_active = siw.c_fam < 4;
+
+        if d_active { stats.d_ops += 1; } else { stats.d_nops += 1; }
+        if s_active { stats.s_ops += 1; } else { stats.s_nops += 1; }
+        if c_active { stats.c_ops += 1; } else { stats.c_nops += 1; }
+
+        // Flux: snapshot general registers before execution
+        let prev_regs = sentron.regs.general;
 
         let active = exec_siw_octawire(sentron, siw, mem);
         stats.ops_retired += active as u64;
         stats.siws_retired += 1;
         stats.cycles += 1;
         sentron.ip += 1;
+
+        // ── Deep alignment: feed pipe activity into NeuronLayer ──────────────
+        // D-pipe maps to Story channel (dense/serial), S-pipe to Light (sparse/parallel).
+        // C-pipe coordinates both — contributes 0.5 to each channel.
+        let story_in = if d_active { 1.0_f32 } else { 0.0 }
+                     + if c_active { 0.5 } else { 0.0 };
+        let light_in = if s_active { 1.0_f32 } else { 0.0 }
+                     + if c_active { 0.5 } else { 0.0 };
+        let vak_out = sentron.neurons.forward(story_in, light_in);
+        // Dominant VakLevel from NeuronLayer output
+        let dom_vak = vak_out.iter().enumerate()
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i).unwrap_or(3);
+        stats.vak_histogram[dom_vak] += 1;
+
+        // ── Sentron flux: L1 norm of register delta ──────────────────────────
+        let flux_siw: i64 = sentron.regs.general.iter()
+            .zip(prev_regs.iter())
+            .map(|(cur, prev)| (cur - prev).abs())
+            .sum();
+        stats.flux_total += flux_siw as f64;
     }
+
+    // Accumulate spanda cycles after stream completes
+    stats.spanda_cycles = sentron.neurons.total_spanda_cycles();
 
     // Restore program (sentron may be inspected after run())
     sentron.program = program;
@@ -720,11 +789,34 @@ pub fn run_batched(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
             if matches!(siw.s_op, SparseOp::SNOP) { stats.s_nops += 1; } else { stats.s_ops += 1; }
             if matches!(siw.c_op, CoordOp::CNOP) { stats.c_nops += 1; } else { stats.c_ops += 1; }
 
+            let d_active = siw.d_fam < 4;
+            let s_active = siw.s_fam < 4;
+            let c_active = siw.c_fam < 4;
+            let prev_regs = sentron.regs.general;
+
             let active = exec_siw_octawire(sentron, &siw, mem);
             stats.ops_retired += active as u64;
             stats.siws_retired += 1;
             stats.cycles += 1;
             sentron.ip += 1;
+
+            // Deep alignment: NeuronLayer feed
+            let story_in = if d_active { 1.0_f32 } else { 0.0 }
+                         + if c_active { 0.5 } else { 0.0 };
+            let light_in = if s_active { 1.0_f32 } else { 0.0 }
+                         + if c_active { 0.5 } else { 0.0 };
+            let vak_out = sentron.neurons.forward(story_in, light_in);
+            let dom_vak = vak_out.iter().enumerate()
+                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
+                .map(|(i, _)| i).unwrap_or(3);
+            stats.vak_histogram[dom_vak] += 1;
+
+            // Sentron flux: L1 register delta
+            let flux_siw: i64 = sentron.regs.general.iter()
+                .zip(prev_regs.iter())
+                .map(|(cur, prev)| (cur - prev).abs())
+                .sum();
+            stats.flux_total += flux_siw as f64;
         }
 
         sentron.retired = stats.siws_retired;
@@ -732,6 +824,7 @@ pub fn run_batched(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
         i = run_end;
     }
 
+    stats.spanda_cycles = sentron.neurons.total_spanda_cycles();
     sentron.retire();
     stats
 }
