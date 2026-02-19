@@ -1,20 +1,22 @@
 //! asi — Interactive vTPU frontend
 //!
 //! A REPL for interacting with sentrons, memory, and the execution engine
-//! in real-time. No deps beyond std.
+//! in real-time. Includes SQ daemon integration for persistent phext storage.
 
 use std::io::{self, Write, BufRead};
 use vtpu_runtime::*;
+use vtpu_runtime::sq_client::{SqClient, SqConfig};
 
 struct Vm {
     sentrons: Vec<Sentron>,
     mem: Memory,
     active: usize,
+    sq: Option<SqClient>,
 }
 
 impl Vm {
     fn new() -> Self {
-        let mut vm = Vm { sentrons: Vec::new(), mem: Memory::new(), active: 0 };
+        let mut vm = Vm { sentrons: Vec::new(), mem: Memory::new(), active: 0, sq: None };
         vm.sentrons.push(Sentron::new(0, PhextCoord::zero(), 0, 0));
         vm
     }
@@ -50,6 +52,14 @@ fn help() {
     spawn <id> <coord>        Create new sentron
     select <id>               Switch active sentron
     status                    Show all sentrons
+
+    SQ (persistent phext storage):
+    sq connect [host] [port]  Connect to SQ daemon (default: localhost:1337)
+    sq status                 Ping SQ and show version
+    sq read <coord>           Read scroll from SQ at coord
+    sq write <coord> <data>   Write scroll to SQ at coord
+    sq toc                    Show SQ table of contents
+    sq load <coord>           Load i64 from SQ into r0 of active sentron
 
   Other:
     help                      This message
@@ -180,6 +190,76 @@ fn exec_line(vm: &mut Vm, line: &str) {
             let ppt = vm.mem.ppt.stats();
             println!("  mem: {} regions, {:.1}% PTC hit", ppt.regions_allocated, ppt.ptc_hit_rate * 100.0);
         }
+        // ── SQ daemon integration ─────────────────────────────────────────
+        "sq" if p.len() >= 2 => {
+            match p[1] {
+                "connect" => {
+                    let host = if p.len() > 2 { p[2] } else { "localhost" };
+                    let port: u16 = if p.len() > 3 { p[3].parse().unwrap_or(1337) } else { 1337 };
+                    let cfg = SqConfig::new(host, port, "vtpu");
+                    let mut client = SqClient::new(cfg);
+                    if client.ping() {
+                        match client.version() {
+                            Ok(v) => println!("  ✅ connected to SQ at {}:{} — {}", host, port, v.trim()),
+                            Err(_) => println!("  ✅ connected to SQ at {}:{}", host, port),
+                        }
+                        vm.sq = Some(client);
+                    } else {
+                        println!("  ❌ could not reach SQ at {}:{}", host, port);
+                    }
+                }
+                "status" => {
+                    if let Some(ref mut sq) = vm.sq {
+                        match sq.status() {
+                            Ok(s) => println!("  {}", s.trim()),
+                            Err(e) => println!("  ❌ {}", e),
+                        }
+                    } else {
+                        println!("  not connected — use 'sq connect'");
+                    }
+                }
+                "read" if p.len() >= 3 => {
+                    if let Some(ref mut sq) = vm.sq {
+                        match sq.select(p[2]) {
+                            Ok(s) => println!("  [{}]\n{}", p[2], s),
+                            Err(e) => println!("  ❌ {}", e),
+                        }
+                    } else { println!("  not connected"); }
+                }
+                "write" if p.len() >= 4 => {
+                    if let Some(ref mut sq) = vm.sq {
+                        let data = p[3..].join(" ");
+                        match sq.insert(p[2], &data) {
+                            Ok(_)  => println!("  ✅ wrote {} bytes to {}", data.len(), p[2]),
+                            Err(e) => println!("  ❌ {}", e),
+                        }
+                    } else { println!("  not connected"); }
+                }
+                "toc" => {
+                    if let Some(ref mut sq) = vm.sq {
+                        match sq.toc() {
+                            Ok(t) => println!("{}", t),
+                            Err(e) => println!("  ❌ {}", e),
+                        }
+                    } else { println!("  not connected"); }
+                }
+                "load" if p.len() >= 3 => {
+                    // Read scroll from SQ, parse as i64, store in r0
+                    if let Some(ref mut sq) = vm.sq {
+                        match sq.select(p[2]) {
+                            Ok(s) => {
+                                let v: i64 = s.trim().parse().unwrap_or(0);
+                                vm.s_mut().regs.general[0] = v;
+                                println!("  r0 ← {} (from {})", v, p[2]);
+                            }
+                            Err(e) => println!("  ❌ {}", e),
+                        }
+                    } else { println!("  not connected"); }
+                }
+                _ => println!("  sq subcommands: connect status read write toc load"),
+            }
+        }
+
         _ => println!("  unknown: '{}'. type 'help'", p[0]),
     }
 }
