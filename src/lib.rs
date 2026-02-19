@@ -123,3 +123,4 @@ pub mod assoc;
 pub mod cpu_sched;
 pub mod redux;
 pub mod sysfs;
+pub mod cluster;
