@@ -1,0 +1,5 @@
+[build]
+# Enable CPU-native features for release builds.
+# This enables AVX2+BMI2 on AWS (Zen 1), AVX-512 on ranch (Zen 4).
+# WARNING: binaries built with this flag are NOT portable.
+rustflags = ["-C", "target-cpu=native"]

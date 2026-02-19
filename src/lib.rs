@@ -90,7 +90,7 @@ pub use memory::Memory;
 pub use iching::{Trigram, Element, Hexagram, SentronNode, SemanticCircle};
 pub use harmonic::{HarmonicState, HarmonicSentron, coord_to_degree};
 pub use sentron::{Sentron, SentronState, RegisterFile, NeuronWiring};
-pub use exec::{run as exec_run, run_standalone as exec_run_standalone, ExecStats};
+pub use exec::{run as exec_run, run_standalone as exec_run_standalone, run_batched as exec_run_batched, exec_stream_batched, exec_siw_octawire, ExecStats};
 pub use smt::{SmtPair, TrainStats};
 pub use analysis::{PortConflictAnalyzer, CacheThrashDetector, MemoryPatternAnalyzer, LocalityAnalyzer};
 pub use curves::{ZOrderCurve, HilbertCurve};
