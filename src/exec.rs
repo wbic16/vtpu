@@ -617,23 +617,29 @@ pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
         return stats;
     }
 
-    while sentron.ip < sentron.program.len() {
-        let siw = sentron.program[sentron.ip].clone();
+    // W20: eliminate per-SIW clone by extracting program out of sentron.
+    // We swap the program Vec out, iterate by value, then restore.
+    // This avoids the borrow conflict (sentron.program[i] while sentron is &mut)
+    // and removes the heap clone per SIW.
+    let program = std::mem::take(&mut sentron.program);
 
-        if matches!(siw.d_op, DenseOp::DNOP) { stats.d_nops += 1; } else { stats.d_ops += 1; }
-        if matches!(siw.s_op, SparseOp::SNOP) { stats.s_nops += 1; } else { stats.s_ops += 1; }
-        if matches!(siw.c_op, CoordOp::CNOP) { stats.c_nops += 1; } else { stats.c_ops += 1; }
+    for siw in &program {
+        if siw.d_fam == 4 { stats.d_nops += 1; } else { stats.d_ops += 1; }
+        if siw.s_fam == 4 { stats.s_nops += 1; } else { stats.s_ops += 1; }
+        if siw.c_fam == 4 { stats.c_nops += 1; } else { stats.c_ops += 1; }
 
-        let active = exec_siw_octawire(sentron, &siw, mem);
+        let active = exec_siw_octawire(sentron, siw, mem);
         stats.ops_retired += active as u64;
         stats.siws_retired += 1;
         stats.cycles += 1;
-
         sentron.ip += 1;
-        sentron.retired = stats.siws_retired;
-        sentron.cycles = stats.cycles;
     }
 
+    // Restore program (sentron may be inspected after run())
+    sentron.program = program;
+    // Flush stats to sentron state once at end — not per SIW
+    sentron.retired = stats.siws_retired;
+    sentron.cycles  = stats.cycles;
     sentron.retire();
     stats
 }
