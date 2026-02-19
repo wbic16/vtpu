@@ -742,8 +742,8 @@ pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
         // ── Sentron flux: L1 norm of register delta ──────────────────────────
         let flux_siw: i64 = sentron.regs.general.iter()
             .zip(prev_regs.iter())
-            .map(|(cur, prev)| (cur - prev).abs())
-            .sum();
+            .map(|(cur, prev)| cur.wrapping_sub(*prev).wrapping_abs())
+            .sum::<i64>().wrapping_abs();
         stats.flux_total += flux_siw as f64;
     }
 
@@ -814,7 +814,7 @@ pub fn run_batched(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
             // Sentron flux: L1 register delta
             let flux_siw: i64 = sentron.regs.general.iter()
                 .zip(prev_regs.iter())
-                .map(|(cur, prev)| (cur - prev).abs())
+                .map(|(cur, prev)| cur.wrapping_sub(*prev).wrapping_abs())
                 .sum();
             stats.flux_total += flux_siw as f64;
         }
