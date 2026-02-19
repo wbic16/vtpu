@@ -101,6 +101,7 @@ pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub mod pool;
 pub use pool::SentronPool;
 pub mod topology;
+pub mod zuna;
 pub mod prefetch;
 pub mod sparse_access;
 pub mod cache_sim;
