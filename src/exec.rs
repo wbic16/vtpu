@@ -73,6 +73,9 @@ fn ternary_apply(activation: i64, trits: u64) -> i64 {
 }
 
 /// Execute one SIW against a sentron's register file. Returns active op count (0-3).
+/// Legacy triple-match dispatch (pre-W19). Preserved for reference/comparison.
+/// The OctaWire dispatch (`exec_siw_octawire`) is now the primary execution path.
+#[allow(dead_code)]
 fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
     let mut active = 0u8;
 
@@ -609,7 +612,7 @@ pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
         if matches!(siw.s_op, SparseOp::SNOP) { stats.s_nops += 1; } else { stats.s_ops += 1; }
         if matches!(siw.c_op, CoordOp::CNOP) { stats.c_nops += 1; } else { stats.c_ops += 1; }
 
-        let active = exec_siw(sentron, &siw, mem);
+        let active = exec_siw_octawire(sentron, &siw, mem);
         stats.ops_retired += active as u64;
         stats.siws_retired += 1;
         stats.cycles += 1;
