@@ -506,7 +506,8 @@ fn exec_s_address(sentron: &mut Sentron, siw: &SIW) -> u8 {
         SparseOp::SINDEX { rd, base, offset, dim } => {
             let mut coord = sentron.regs.phext[base as usize].clone();
             let old_val = coord.get_dim(dim) as i32;
-            let new_val = old_val.wrapping_add(offset).max(0) as u16;
+            // Clamp to [1, MAX_DIM] — phext coordinates are 1-indexed, 11-bit max
+            let new_val = old_val.wrapping_add(offset).clamp(1, 2047) as u16;
             coord.set_dim(dim, new_val);
             sentron.regs.general[rd as usize] = new_val as i64;
             sentron.regs.phext[rd as usize % 8] = coord;
@@ -556,7 +557,7 @@ fn exec_c_pack(sentron: &mut Sentron, siw: &SIW) -> u8 {
         // Pack rs1 → msg[0..8], rs2 → msg[8..16] as separate LE i64 values
         let a = sentron.regs.general[rs1 as usize].to_le_bytes();
         let b = sentron.regs.general[rs2 as usize].to_le_bytes();
-        let msg = &mut sentron.regs.message[rd as usize];
+        let msg = &mut sentron.regs.message[rd as usize % 4];
         msg[..8].copy_from_slice(&a);
         msg[8..16].copy_from_slice(&b);
     }
@@ -631,6 +632,52 @@ pub fn run(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
         sentron.ip += 1;
         sentron.retired = stats.siws_retired;
         sentron.cycles = stats.cycles;
+    }
+
+    sentron.retire();
+    stats
+}
+
+/// OctaWire batched stream executor.
+///
+/// Groups consecutive SIWs by mode byte → LLVM can vectorize within each run.
+/// The "pause between breaths" (delimiter between SIWs) is pre-filled with the
+/// family index — zero decision overhead at runtime (VBT verse 24).
+pub fn run_batched(sentron: &mut Sentron, mem: &mut Memory) -> ExecStats {
+    let mut stats = ExecStats::default();
+
+    if sentron.state != SentronState::Running {
+        return stats;
+    }
+
+    let len = sentron.program.len();
+    let mut i = 0;
+
+    while i < len {
+        // Find end of same-mode run without cloning
+        let mode = sentron.program[i].mode_bits();
+        let mut run_end = i + 1;
+        while run_end < len && sentron.program[run_end].mode_bits() == mode {
+            run_end += 1;
+        }
+
+        // Execute run by index — avoids borrow conflict with exec_siw_octawire
+        while sentron.ip < run_end {
+            let siw = sentron.program[sentron.ip].clone();
+            if matches!(siw.d_op, DenseOp::DNOP) { stats.d_nops += 1; } else { stats.d_ops += 1; }
+            if matches!(siw.s_op, SparseOp::SNOP) { stats.s_nops += 1; } else { stats.s_ops += 1; }
+            if matches!(siw.c_op, CoordOp::CNOP) { stats.c_nops += 1; } else { stats.c_ops += 1; }
+
+            let active = exec_siw_octawire(sentron, &siw, mem);
+            stats.ops_retired += active as u64;
+            stats.siws_retired += 1;
+            stats.cycles += 1;
+            sentron.ip += 1;
+        }
+
+        sentron.retired = stats.siws_retired;
+        sentron.cycles = stats.cycles;
+        i = run_end;
     }
 
     sentron.retire();
@@ -837,5 +884,223 @@ mod tests {
 
         assert_eq!(s.regs.general[6], 26); // dot([2,4], [3,5]) = 6+20 = 26
         assert_eq!(stats.siws_retired, 7);
+    }
+
+    // ── W19 OctaWire Tests ─────────────────────────────────────────────────
+
+    #[test]
+    fn octawire_nop_skips_all_pipes() {
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+        let siw = SIW::nop();
+        assert_eq!(siw.d_fam, 4);
+        assert_eq!(siw.s_fam, 4);
+        assert_eq!(siw.c_fam, 4);
+        let active = exec_siw_octawire(&mut s, &siw, &mut mem);
+        assert_eq!(active, 0, "NOP SIW should retire 0 active ops");
+    }
+
+    #[test]
+    fn octawire_mode_bits_nop() {
+        let siw = SIW::nop();
+        assert_eq!(siw.mode_bits(), 0b000, "all-NOP = mode 0");
+    }
+
+    #[test]
+    fn octawire_mode_bits_d_only() {
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 },
+            SparseOp::SNOP,
+            CoordOp::CNOP,
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.mode_bits(), 0b001, "D-only = bit 0 set");
+    }
+
+    #[test]
+    fn octawire_mode_bits_all_active() {
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 },
+            SparseOp::SINDEX { rd: 0, base: 0, offset: 0, dim: 0 },
+            CoordOp::CPACK { rd: 0, rs1: 1, rs2: 2, fmt: crate::pipes::MessageFormat::Result },
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.mode_bits(), 0b111, "all active = bits 0,1,2 set");
+    }
+
+    #[test]
+    fn octawire_d_arithmetic_fam0() {
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+        s.regs.general[1] = 10;
+        s.regs.general[2] = 5;
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.d_fam, 0, "DADD is Arithmetic family (0)");
+        exec_siw_octawire(&mut s, &siw, &mut mem);
+        assert_eq!(s.regs.general[0], 15);
+    }
+
+    #[test]
+    fn octawire_d_hdc_fam2() {
+        let siw = SIW::new(
+            DenseOp::DHDENC { rd: 0, rs: 1, width: 64 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.d_fam, 2, "DHDENC is HDC family (2)");
+    }
+
+    #[test]
+    fn octawire_d_ternary_fam3() {
+        let siw = SIW::new(
+            DenseOp::DTERNARY { rd: 0, rs1: 1, trit_reg: 2 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.d_fam, 3, "DTERNARY is Ternary family (3)");
+    }
+
+    #[test]
+    fn octawire_s_load_fam0() {
+        let siw = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SGATHER { rd: 0, coord_idx: 0, width: 8 },
+            CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.s_fam, 0, "SGATHER is Load family (0)");
+    }
+
+    #[test]
+    fn octawire_s_store_fam1() {
+        let siw = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SSCATTR { rs: 0, coord_idx: 0, width: 8 },
+            CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.s_fam, 1, "SSCATTR is Store family (1)");
+    }
+
+    #[test]
+    fn octawire_s_address_fam2() {
+        let siw = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SINDEX { rd: 0, base: 0, offset: 0, dim: 0 },
+            CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.s_fam, 2, "SINDEX is Address family (2)");
+    }
+
+    #[test]
+    fn octawire_c_pack_fam0() {
+        let siw = SIW::new(
+            DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CPACK { rd: 0, rs1: 1, rs2: 2, fmt: crate::pipes::MessageFormat::Result },
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.c_fam, 0, "CPACK is Pack family (0)");
+    }
+
+    #[test]
+    fn octawire_c_send_fam1() {
+        let siw = SIW::new(
+            DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 },
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.c_fam, 1, "CSEND is Send family (1)");
+    }
+
+    #[test]
+    fn octawire_c_barrier_fam2() {
+        let siw = SIW::new(
+            DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CBAR { barrier_id: 0, count: 4 },
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.c_fam, 2, "CBAR is Barrier family (2)");
+    }
+
+    #[test]
+    fn octawire_parity_with_standard() {
+        // run() now uses exec_siw_octawire internally — run_batched should match
+        let program = vec![
+            SIW::new(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DMUL { rd: 3, rs1: 0, rs2: 1 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+            SIW::new(DenseOp::DSUB { rd: 4, rs1: 3, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+        ];
+
+        let mut s1 = make_sentron();
+        let mut s2 = make_sentron();
+        s1.regs.general[1] = 7; s1.regs.general[2] = 3;
+        s2.regs.general[1] = 7; s2.regs.general[2] = 3;
+
+        let mut mem1 = Memory::new();
+        let mut mem2 = Memory::new();
+        s1.spawn(program.clone());
+        s2.spawn(program.clone());
+
+        let stats1 = run(&mut s1, &mut mem1);
+        let stats2 = run_batched(&mut s2, &mut mem2);
+
+        assert_eq!(s1.regs.general[0], s2.regs.general[0], "r0 must match");
+        assert_eq!(s1.regs.general[3], s2.regs.general[3], "r3 must match");
+        assert_eq!(s1.regs.general[4], s2.regs.general[4], "r4 must match");
+        assert_eq!(stats1.ops_retired, stats2.ops_retired, "ops retired must match");
+    }
+
+    #[test]
+    fn octawire_batched_same_mode_run() {
+        // All-arithmetic stream: batched should group all into one run
+        let program: Vec<SIW> = (0..10).map(|i| {
+            let rd = (i % 14) as u8;
+            let rs1 = ((i + 1) % 15) as u8;
+            let rs2 = ((i + 2) % 15) as u8;
+            SIW::new(DenseOp::DADD { rd, rs1, rs2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero())
+        }).collect();
+
+        let mode = program[0].mode_bits();
+        assert!(program.iter().all(|s| s.mode_bits() == mode), "all same mode");
+
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+        s.spawn(program);
+        let stats = run_batched(&mut s, &mut mem);
+        assert_eq!(stats.siws_retired, 10);
+        assert_eq!(stats.ops_retired, 10);
+    }
+
+    #[test]
+    fn octawire_fma_executes_correctly() {
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+        s.regs.general[1] = 3;
+        s.regs.general[2] = 4;
+        s.regs.general[3] = 5; // rd=0, fma = r1*r2 + r3 = 3*4+5 = 17
+        let siw = SIW::new(
+            DenseOp::DFMA { rd: 0, rs1: 1, rs2: 2, rs3: 3 },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        );
+        exec_siw_octawire(&mut s, &siw, &mut mem);
+        assert_eq!(s.regs.general[0], 17);
+    }
+
+    #[test]
+    fn octawire_reduce_d_fam1() {
+        let siw = SIW::new(
+            DenseOp::DRED { rd: 0, rs1: 1, op: crate::pipes::ReductionOp::Sum },
+            SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero(),
+        );
+        assert_eq!(siw.d_fam, 1, "DRED is Reduce family (1)");
+    }
+
+    #[test]
+    fn octawire_empty_stream_batched() {
+        let mut s = make_sentron();
+        let mut mem = Memory::new();
+        s.spawn(vec![]);
+        let stats = run_batched(&mut s, &mut mem);
+        assert_eq!(stats.siws_retired, 0);
+        assert_eq!(stats.ops_retired, 0);
     }
 }
