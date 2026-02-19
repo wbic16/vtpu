@@ -525,13 +525,23 @@ fn exec_s_route(sentron: &mut Sentron, siw: &SIW) -> u8 {
     match siw.s_op {
         SparseOp::SPREFCH { .. } => {}
         SparseOp::SASSOC { rd, .. } => {
-            sentron.regs.general[rd as usize] = 0;
+            let coord = sentron.regs.phext[0];
+            let idx = sentron.assoc.store(&coord);
+            sentron.regs.general[rd as usize] = idx as i64;
         }
         SparseOp::SROUTE { rd, .. } => {
-            sentron.regs.general[rd as usize] = 0;
+            let coord = sentron.regs.phext[0];
+            let (sim, hash) = sentron.assoc.route(&coord);
+            sentron.regs.general[rd as usize] = sim;
+            if (rd as usize) + 1 < 16 {
+                sentron.regs.general[rd as usize + 1] = hash;
+            }
         }
         SparseOp::SNEIGHBR { rd, .. } => {
-            sentron.regs.general[rd as usize] = 0;
+            let coord = sentron.regs.phext[0];
+            let threshold = sentron.regs.general[1] as f64 / 1000.0;
+            let count = sentron.assoc.neighbors(&coord, threshold);
+            sentron.regs.general[rd as usize] = count;
         }
         _ => {}
     }
@@ -543,12 +553,12 @@ fn exec_s_route(sentron: &mut Sentron, siw: &SIW) -> u8 {
 #[inline(always)]
 fn exec_c_pack(sentron: &mut Sentron, siw: &SIW) -> u8 {
     if let CoordOp::CPACK { rd, rs1, rs2, .. } = siw.c_op {
-        let hi = (sentron.regs.general[rs1 as usize] as u64) << 32;
-        let lo = sentron.regs.general[rs2 as usize] as u64 & 0xFFFF_FFFF;
-        let packed = (hi | lo) as i64;
-        for byte_idx in 0..8 {
-            sentron.regs.message[rd as usize % 4][byte_idx] = ((packed >> (byte_idx * 8)) & 0xFF) as u8;
-        }
+        // Pack rs1 → msg[0..8], rs2 → msg[8..16] as separate LE i64 values
+        let a = sentron.regs.general[rs1 as usize].to_le_bytes();
+        let b = sentron.regs.general[rs2 as usize].to_le_bytes();
+        let msg = &mut sentron.regs.message[rd as usize];
+        msg[..8].copy_from_slice(&a);
+        msg[8..16].copy_from_slice(&b);
     }
     1
 }
@@ -557,10 +567,11 @@ fn exec_c_pack(sentron: &mut Sentron, siw: &SIW) -> u8 {
 fn exec_c_send(sentron: &mut Sentron, siw: &SIW) -> u8 {
     match siw.c_op {
         CoordOp::CRECV { rd, .. } => {
-            if let Some((_, val)) = sentron.inbox.first().cloned() {
-                sentron.regs.general[rd as usize] = val;
-                sentron.inbox.remove(0);
-            }
+            // Pop from inbox (LIFO) matching old exec_siw behavior
+            sentron.regs.general[rd as usize] = match sentron.inbox.pop() {
+                Some((_, val)) => val,
+                None => 0,
+            };
         }
         CoordOp::CSEND { .. } | CoordOp::CROUTE { .. } | CoordOp::CFANOUT { .. } => {}
         _ => {}

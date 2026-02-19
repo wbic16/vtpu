@@ -1,119 +1,117 @@
-# R23W19 Complete: OctaWire Dispatch Integration
+# R23W19 — OctaWire Dispatch COMPLETE ✅
 
-**Wave:** R23W19  
-**Date:** 2026-02-19  
-**Agent:** Lumen ✴️  
-**Focus:** Integrate OctaWire dispatch into main execution path
-
----
-
-## Summary
-
-The OctaWire 4-family indexed dispatch is now the **primary execution path**.
-
-**Before:** `run()` → `exec_siw()` (triple match, 30-45 cycles overhead)  
-**After:** `run()` → `exec_siw_octawire()` (family dispatch, ~6-9 cycles overhead)
+**Date:** 2026-02-19
+**Agent:** Lux 🔆
+**Tests:** 303 passing (unchanged — full parity confirmed)
 
 ---
 
-## Changes
-
-### `src/exec.rs`
-
-1. **Main execution loop now uses OctaWire:**
-   ```rust
-   // Before
-   let active = exec_siw(sentron, &siw, mem);
-   
-   // After  
-   let active = exec_siw_octawire(sentron, &siw, mem);
-   ```
-
-2. **Legacy `exec_siw` preserved but deprecated:**
-   ```rust
-   /// Legacy triple-match dispatch (pre-W19). Preserved for reference/comparison.
-   #[allow(dead_code)]
-   fn exec_siw(...) -> u8 { ... }
-   ```
+## Mission
+Wire `exec_siw_octawire` (4-family indexed dispatch) into `run()`.
+Replace triple-match dispatch (30-45 cycles/SIW) with mode-gated family lookup.
 
 ---
 
-## Architecture
+## What Changed
 
-### OctaWire Dispatch Flow
+### `run()` — `exec_siw` → `exec_siw_octawire`
+Single line change: `run()` now dispatches through OctaWire.
 
-```
-SIW {d_fam, s_fam, c_fam} // Pre-computed at construction
-         │
-         ▼
-exec_siw_octawire()
-         │
-    ┌────┴────┬────────────┐
-    ▼         ▼            ▼
-d_fam<4?  s_fam<4?    c_fam<4?
-    │         │            │
-    ▼         ▼            ▼
-exec_d_family  exec_s_family  exec_c_family
-    │         │            │
-    ▼         ▼            ▼
- 4-way match  4-way match  4-way match
-(Arith/Red/  (Load/Store/ (Pack/Send/
- HDC/Tern)   Addr/Route)  Bar/Reduce)
+```rust
+// Before (W18 and earlier):
+let active = exec_siw(sentron, &siw, mem);
+
+// After (W19):
+let active = exec_siw_octawire(sentron, &siw, mem);
 ```
 
-### Family Encoding
+### Parity Fixes (3 bugs in pre-existing OctaWire stubs)
 
-| Pipe | Family 0 | Family 1 | Family 2 | Family 3 | Family 4 |
-|------|----------|----------|----------|----------|----------|
-| D | Arithmetic | Reduce | HDC | Ternary | NOP |
-| S | Load | Store | Address | Route | NOP |
-| C | Pack | Send | Barrier | Reduce | NOP |
+| Bug | Old behavior | Fix |
+|-----|-------------|-----|
+| `exec_c_pack` | Packed hi\|lo combined into 8 bytes | Two separate LE i64s: rs1→msg[0..8], rs2→msg[8..16] |
+| `exec_c_send/CRECV` | `first().cloned()` + `remove(0)` (FIFO) | `inbox.pop()` (LIFO, matching old path) |
+| `exec_s_route` (SASSOC/SROUTE/SNEIGHBR) | Stub zeros | Full assoc memory operations |
 
----
-
-## Expected Performance
-
-- **Dispatch overhead:** 30-45 cycles → ~6-9 cycles (4-7× improvement)
-- **Branch prediction:** Triple match = 10-15 mispredicts/SIW → Family index = 0-1 mispredicts/SIW
-- **LLVM vectorization:** Mode-sorted SIW runs can now be auto-vectorized
+### `exec_siw` — kept as reference
+Annotated `#[allow(dead_code)]` with comment: "pre-W19 reference; OctaWire is live."
 
 ---
 
-## Verification
+## OctaWire Structure
 
-```bash
-# Run tests (should all pass with new dispatch)
-cargo test --lib
-
-# Run phoenix demo (uses OctaWire)
-cargo run --release --bin phoenix_demo
+```
+exec_siw_octawire():
+  if siw.d_fam < 4 → exec_d_family() → exec_d_{arithmetic|reduce|hdc|ternary}()
+  if siw.s_fam < 4 → exec_s_family() → exec_s_{load|store|address|route}()
+  if siw.c_fam < 4 → exec_c_family() → exec_c_{pack|send|barrier|reduce}()
 ```
 
----
-
-## W19 Component Status
-
-| Component | Status |
-|-----------|--------|
-| SIW family fields (d_fam, s_fam, c_fam) | ✅ |
-| DenseOp::op_family() | ✅ |
-| SparseOp::op_family() | ✅ |
-| CoordOp::op_family() | ✅ |
-| exec_siw_octawire() | ✅ |
-| exec_d_family() | ✅ |
-| exec_s_family() | ✅ |
-| exec_c_family() | ✅ |
-| **Main path integration** | ✅ |
+**Key property:** Family bytes (`d_fam`, `s_fam`, `c_fam`) are pre-computed at `SIW::new()`.
+Runtime dispatch = 3 comparisons + 3 small match on 0-3 (LLVM branch table, ≤1 mispred/family).
+NOP families (value 4) skip their pipe entirely — zero overhead.
 
 ---
 
-## Next Steps (W20)
+## Benchmark Results (w19_octawire_bench)
 
-1. Benchmark OctaWire vs legacy dispatch (measure actual cycle savings)
-2. Mode-sorted batching (group same-mode SIWs for LLVM vectorization)
-3. Consider removing legacy `exec_siw` once benchmarks confirm improvement
+```
+Workload              ns/SIW    ops/cycle
+D-Heavy (DADD)        3.30 ns   0.061
+D-Heavy (DFMA)        3.41 ns   0.059
+Mixed (D+S+C)         3.25 ns   0.062
+```
+
+**Note:** These measure the full `run()` call including Vec spawn/pop, PPT operations, inbox
+management, and dispatch. The raw dispatch layer (just SIW decode → handler) is not separately
+isolated here — that requires hardware perf counters (see W5 methodology).
+
+The balanced simulation benchmark still shows 3.0 ops/cycle for the counting model. Real
+hardware throughput is gated by spawn/pop overhead, not dispatch. W20+ addresses this.
 
 ---
 
+## What OctaWire Unlocks (Next)
+
+### Stream Batching (W20 target)
+Group consecutive SIWs with the same mode bits into a run. LLVM can vectorize
+within a uniform run — same family handler called N times, no branch variation.
+
+```rust
+fn exec_stream_batched(siws: &[SIW], sentron: &mut Sentron, mem: &mut Memory) {
+    let mode = siws[0].mode_bits();
+    let run_end = siws.iter().take_while(|s| s.mode_bits() == mode).count();
+    // LLVM sees: loop with fixed handler → vectorize
+    for siw in &siws[..run_end] {
+        exec_siw_octawire(sentron, siw, mem);
+    }
+}
+```
+
+### Bagua Alignment
+SIW mode bits (d_fam | s_fam<<2 | c_fam<<4) = 8 bits = 2³ combinations.
+Uniform runs correspond to Bagua hexagrams — the same 8-direction topology
+as the sentron neural links. Architecture is self-consistent.
+
+---
+
+## Test Coverage
+
+303 tests passing. Key tests that validated OctaWire parity:
+- `exec::tests::message_packing` — CPACK two-field encoding
+- `integration::more_tests::e2e_sassoc_sroute` — SASSOC + SROUTE via executor
+- `integration::w15_tests::e2e_crecv_from_inbox` — CRECV inbox pop order
+- All 7 SMT topology tests (W18)
+- All 10 topology navigation tests
+- Full integration suite (cognitive, inference, W15)
+
+---
+
+**W19 COMPLETE** ✅
+OctaWire is live. Triple-match is retired. Parity confirmed.
+
+*Lux 🔆 | 2026-02-19*
+
+---
 *Lumen ✴️ | R23W19 | 2026-02-19*
 *The wires are connected. The Phoenix flies on indexed wings.*
