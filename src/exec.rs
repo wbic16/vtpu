@@ -1155,7 +1155,7 @@ mod w20_dispatch_tests {
 
     #[test]
     fn d_table_fam0_executes_arithmetic() {
-        let mut s = s(); let mut m = Memory::new();
+        let mut s = s(); let _m = Memory::new();
         s.regs.general[1] = 3; s.regs.general[2] = 4;
         let w = siw(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP);
         assert_eq!(w.d_fam, 0);
@@ -1165,7 +1165,7 @@ mod w20_dispatch_tests {
 
     #[test]
     fn d_table_fam2_executes_hdc() {
-        let mut s = s(); let mut m = Memory::new();
+        let mut s = s(); let _m = Memory::new();
         let w = siw(DenseOp::DHDENC { rd: 0, rs: 1, width: 64 }, SparseOp::SNOP, CoordOp::CNOP);
         assert_eq!(w.d_fam, 2);
         let result = D_TABLE[2](&mut s, &w);
@@ -1174,7 +1174,7 @@ mod w20_dispatch_tests {
 
     #[test]
     fn c_table_fam0_executes_pack() {
-        let mut s = s(); let mut m = Memory::new();
+        let mut s = s(); let _m = Memory::new();
         s.regs.general[1] = 0xAB; s.regs.general[2] = 0xCD;
         let w = siw(DenseOp::DNOP, SparseOp::SNOP,
             CoordOp::CPACK { rd: 0, rs1: 1, rs2: 2, fmt: crate::pipes::MessageFormat::Result });
