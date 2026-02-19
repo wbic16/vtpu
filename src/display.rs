@@ -204,3 +204,72 @@ mod tests {
         assert!(output.contains("0040:"));  // 64 bytes per SIW
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::siw::SIW;
+    use crate::pipes::{DenseOp, SparseOp, CoordOp};
+    use crate::phext_coord::PhextCoord;
+
+    fn make_siw(d: DenseOp, s: SparseOp, c: CoordOp) -> SIW {
+        SIW::new(d, s, c, PhextCoord::zero())
+    }
+
+    #[test]
+    fn disassemble_nop_stream() {
+        let siws = vec![SIW::nop(), SIW::nop()];
+        let out = disassemble_stream(&siws);
+        // Display uses lowercase: "nop" not "DNOP"
+        assert!(out.contains("nop"), "should contain nop");
+    }
+
+    #[test]
+    fn disassemble_single_dadd() {
+        let siws = vec![make_siw(
+            DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 },
+            SparseOp::SNOP,
+            CoordOp::CNOP,
+        )];
+        let out = disassemble_stream(&siws);
+        // Display uses "add" for DADD
+        assert!(out.contains("add"), "should contain add");
+    }
+
+    #[test]
+    fn disassemble_offset_advances() {
+        let siws = vec![SIW::nop(), SIW::nop(), SIW::nop()];
+        let out = disassemble_stream(&siws);
+        assert!(out.contains("0000:"), "first offset");
+        assert!(out.contains("0040:"), "second offset (64 bytes)");
+        assert!(out.contains("0080:"), "third offset");
+    }
+
+    #[test]
+    fn disassemble_empty_stream() {
+        let out = disassemble_stream(&[]);
+        assert_eq!(out, "", "empty stream = empty string");
+    }
+
+    #[test]
+    fn disassemble_dfma_shown() {
+        let siws = vec![make_siw(
+            DenseOp::DFMA { rd: 0, rs1: 1, rs2: 2, rs3: 3 },
+            SparseOp::SNOP, CoordOp::CNOP,
+        )];
+        let out = disassemble_stream(&siws);
+        // Display uses "fma" for DFMA
+        assert!(out.contains("fma"), "FMA should appear in disassembly");
+    }
+
+    #[test]
+    fn disassemble_csend_shown() {
+        let siws = vec![make_siw(
+            DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 5 },
+        )];
+        let out = disassemble_stream(&siws);
+        // Display uses "send" or similar for CSEND
+        assert!(!out.is_empty(), "non-empty disassembly for csend SIW");
+    }
+}

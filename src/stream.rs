@@ -246,3 +246,74 @@ mod tests {
         assert!(matches!(stream[0].d_op, DenseOp::DNOP));
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::siw::SIW;
+    use crate::pipes::{DenseOp, SparseOp, CoordOp};
+    use crate::phext_coord::PhextCoord;
+
+    fn dadd(rd: u8, rs1: u8, rs2: u8) -> SIW {
+        SIW::new(DenseOp::DADD { rd, rs1, rs2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero())
+    }
+
+    #[test]
+    fn stream_builder_push_dadd() {
+        let mut b = StreamBuilder::new();
+        b.push(dadd(0, 1, 2));
+        let s = b.build();
+        assert_eq!(s.len(), 1);
+        assert!(matches!(s[0].d_op, DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }));
+    }
+
+    #[test]
+    fn stream_builder_push_dmul() {
+        let mut b = StreamBuilder::new();
+        b.push(SIW::new(DenseOp::DMUL { rd: 3, rs1: 4, rs2: 5 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()));
+        let s = b.build();
+        assert!(matches!(s[0].d_op, DenseOp::DMUL { rd: 3, .. }));
+    }
+
+    #[test]
+    fn stream_builder_push_dfma() {
+        let mut b = StreamBuilder::new();
+        b.push(SIW::new(DenseOp::DFMA { rd: 0, rs1: 1, rs2: 2, rs3: 3 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()));
+        let s = b.build();
+        assert!(matches!(s[0].d_op, DenseOp::DFMA { rd: 0, rs1: 1, rs2: 2, rs3: 3 }));
+    }
+
+    #[test]
+    fn stream_length_tracks_pushes() {
+        let mut b = StreamBuilder::new();
+        b.push(dadd(0, 1, 2));
+        b.push(SIW::new(DenseOp::DMUL { rd: 3, rs1: 4, rs2: 5 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()));
+        b.nop();
+        assert_eq!(b.build().len(), 3);
+    }
+
+    #[test]
+    fn stream_nop_has_all_nop_pipes() {
+        let mut b = StreamBuilder::new();
+        b.nop();
+        let s = b.build();
+        assert!(matches!(s[0].d_op, DenseOp::DNOP));
+        assert!(matches!(s[0].s_op, SparseOp::SNOP));
+        assert!(matches!(s[0].c_op, CoordOp::CNOP));
+    }
+
+    #[test]
+    fn stream_is_empty_on_new() {
+        let b = StreamBuilder::new();
+        assert!(b.is_empty());
+        assert_eq!(b.len(), 0);
+    }
+
+    #[test]
+    fn stream_len_after_push() {
+        let mut b = StreamBuilder::new();
+        b.push(dadd(0, 1, 2));
+        assert_eq!(b.len(), 1);
+        assert!(!b.is_empty());
+    }
+}

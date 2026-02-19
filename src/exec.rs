@@ -336,17 +336,36 @@ pub fn exec_siw_octawire(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> 
     active
 }
 
+/// D-pipe dispatch table: 4 families, const function pointer array.
+/// LLVM sees a simple index load + indirect call — no branch tree.
+type DHandler = fn(&mut Sentron, &SIW) -> u8;
+const D_TABLE: [DHandler; 4] = [
+    exec_d_arithmetic,
+    exec_d_reduce,
+    exec_d_hdc,
+    exec_d_ternary,
+];
+
+/// C-pipe dispatch table: 4 families.
+type CHandler = fn(&mut Sentron, &SIW) -> u8;
+const C_TABLE: [CHandler; 4] = [
+    exec_c_pack,
+    exec_c_send,
+    exec_c_barrier,
+    exec_c_reduce,
+];
+
 #[inline(always)]
 fn exec_d_family(sentron: &mut Sentron, siw: &SIW) -> u8 {
-    match siw.d_fam {
-        0 => exec_d_arithmetic(sentron, siw),
-        1 => exec_d_reduce(sentron, siw),
-        2 => exec_d_hdc(sentron, siw),
-        3 => exec_d_ternary(sentron, siw),
-        _ => 0,
+    if (siw.d_fam as usize) < D_TABLE.len() {
+        D_TABLE[siw.d_fam as usize](sentron, siw)
+    } else {
+        0
     }
 }
 
+/// S-pipe family dispatch — takes &mut Memory so can't use a single const table.
+/// Split into two halves: address/route (no mem) and load/store (needs mem).
 #[inline(always)]
 fn exec_s_family(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
     match siw.s_fam {
@@ -360,12 +379,10 @@ fn exec_s_family(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
 
 #[inline(always)]
 fn exec_c_family(sentron: &mut Sentron, siw: &SIW) -> u8 {
-    match siw.c_fam {
-        0 => exec_c_pack(sentron, siw),
-        1 => exec_c_send(sentron, siw),
-        2 => exec_c_barrier(sentron, siw),
-        3 => exec_c_reduce(sentron, siw),
-        _ => 0,
+    if (siw.c_fam as usize) < C_TABLE.len() {
+        C_TABLE[siw.c_fam as usize](sentron, siw)
+    } else {
+        0
     }
 }
 
@@ -1108,5 +1125,109 @@ mod tests {
         let stats = run_batched(&mut s, &mut mem);
         assert_eq!(stats.siws_retired, 0);
         assert_eq!(stats.ops_retired, 0);
+    }
+}
+
+// ── W20 Dispatch Table Tests ─────────────────────────────────────────────────
+#[cfg(test)]
+mod w20_dispatch_tests {
+    use super::*;
+    use crate::siw::SIW;
+    use crate::pipes::{DenseOp, SparseOp, CoordOp};
+    use crate::phext_coord::PhextCoord;
+    use crate::sentron::Sentron;
+    use crate::memory::Memory;
+
+    fn s() -> Sentron { Sentron::new(0, PhextCoord::zero(), 0, 0) }
+    fn siw(d: DenseOp, sp: SparseOp, c: CoordOp) -> SIW {
+        SIW::new(d, sp, c, PhextCoord::zero())
+    }
+
+    #[test]
+    fn d_table_len_is_4() {
+        assert_eq!(D_TABLE.len(), 4);
+    }
+
+    #[test]
+    fn c_table_len_is_4() {
+        assert_eq!(C_TABLE.len(), 4);
+    }
+
+    #[test]
+    fn d_table_fam0_executes_arithmetic() {
+        let mut s = s(); let mut m = Memory::new();
+        s.regs.general[1] = 3; s.regs.general[2] = 4;
+        let w = siw(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP);
+        assert_eq!(w.d_fam, 0);
+        D_TABLE[0](&mut s, &w);
+        assert_eq!(s.regs.general[0], 7);
+    }
+
+    #[test]
+    fn d_table_fam2_executes_hdc() {
+        let mut s = s(); let mut m = Memory::new();
+        let w = siw(DenseOp::DHDENC { rd: 0, rs: 1, width: 64 }, SparseOp::SNOP, CoordOp::CNOP);
+        assert_eq!(w.d_fam, 2);
+        let result = D_TABLE[2](&mut s, &w);
+        assert_eq!(result, 1, "HDC family should return 1 active op");
+    }
+
+    #[test]
+    fn c_table_fam0_executes_pack() {
+        let mut s = s(); let mut m = Memory::new();
+        s.regs.general[1] = 0xAB; s.regs.general[2] = 0xCD;
+        let w = siw(DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CPACK { rd: 0, rs1: 1, rs2: 2, fmt: crate::pipes::MessageFormat::Result });
+        assert_eq!(w.c_fam, 0);
+        C_TABLE[0](&mut s, &w);
+        let a = i64::from_le_bytes(s.regs.message[0][..8].try_into().unwrap());
+        assert_eq!(a, 0xAB);
+    }
+
+    #[test]
+    fn c_table_fam2_executes_barrier() {
+        let mut s = s();
+        let w = siw(DenseOp::DNOP, SparseOp::SNOP, CoordOp::CBAR { barrier_id: 0, count: 1 });
+        assert_eq!(w.c_fam, 2);
+        let result = C_TABLE[2](&mut s, &w);
+        assert_eq!(result, 1, "barrier returns 1 active op");
+    }
+
+    #[test]
+    fn octawire_nop_fam_skips_table() {
+        let mut s = s(); let mut mem = Memory::new();
+        let w = SIW::nop();
+        // d_fam=4 and c_fam=4 → both exceed table bounds → returns 0
+        let active = exec_siw_octawire(&mut s, &w, &mut mem);
+        assert_eq!(active, 0);
+    }
+
+    #[test]
+    fn d_table_fam3_ternary_active() {
+        let mut s = s();
+        let w = siw(DenseOp::DTPOP { rd: 0, rs: 1 }, SparseOp::SNOP, CoordOp::CNOP);
+        assert_eq!(w.d_fam, 3);
+        let result = D_TABLE[3](&mut s, &w);
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn c_table_fam1_send_active() {
+        let mut s = s();
+        let w = siw(DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 });
+        assert_eq!(w.c_fam, 1);
+        let result = C_TABLE[1](&mut s, &w);
+        assert_eq!(result, 1);
+    }
+
+    #[test]
+    fn c_table_fam3_reduce_active() {
+        let mut s = s();
+        let w = siw(DenseOp::DNOP, SparseOp::SNOP,
+            CoordOp::CREDUCE { rd: 0, rs: 1, op: crate::pipes::ReductionOp::Sum, group: 0 });
+        assert_eq!(w.c_fam, 3);
+        let result = C_TABLE[3](&mut s, &w);
+        assert_eq!(result, 1);
     }
 }

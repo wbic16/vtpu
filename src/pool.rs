@@ -166,3 +166,82 @@ mod tests {
         assert_eq!(pool.available_count(), 360);
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::siw::SIW;
+    use crate::pipes::{DenseOp, SparseOp, CoordOp};
+    use crate::phext_coord::PhextCoord;
+
+    fn make_pool(n: usize) -> SentronPool {
+        SentronPool::new(n, 16)
+    }
+
+    #[test]
+    fn pool_checkout_returns_index() {
+        let mut p = make_pool(4);
+        let idx = p.checkout();
+        assert!(idx.is_some(), "should be able to checkout from non-empty pool");
+    }
+
+    #[test]
+    fn pool_full_checkout_returns_none() {
+        let mut p = make_pool(2);
+        let _ = p.checkout();
+        let _ = p.checkout();
+        assert!(p.checkout().is_none(), "exhausted pool returns None");
+    }
+
+    #[test]
+    fn pool_checkin_returns_slot() {
+        let mut p = make_pool(2);
+        let idx = p.checkout().unwrap();
+        p.checkin(idx);
+        assert_eq!(p.available_count(), 2);
+    }
+
+    #[test]
+    fn pool_capacity_matches_construction() {
+        let p = make_pool(8);
+        assert_eq!(p.capacity(), 8);
+    }
+
+    #[test]
+    fn pool_active_count_tracks_checkouts() {
+        let mut p = make_pool(4);
+        assert_eq!(p.active_count(), 0);
+        let _ = p.checkout();
+        assert_eq!(p.active_count(), 1);
+        let _ = p.checkout();
+        assert_eq!(p.active_count(), 2);
+    }
+
+    #[test]
+    fn pool_load_program_and_execute() {
+        let mut p = make_pool(2);
+        let idx = p.checkout().unwrap();
+        let program = vec![
+            SIW::new(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero()),
+        ];
+        p.load_program(idx, &program);
+        let s = p.get(idx);
+        assert_eq!(s.program.len(), 1);
+    }
+
+    #[test]
+    fn pool_get_mut_allows_modification() {
+        let mut p = make_pool(2);
+        let idx = p.checkout().unwrap();
+        p.get_mut(idx).regs.general[0] = 42;
+        assert_eq!(p.get(idx).regs.general[0], 42);
+    }
+
+    #[test]
+    fn pool_available_plus_active_equals_capacity() {
+        let mut p = make_pool(6);
+        let _ = p.checkout();
+        let _ = p.checkout();
+        assert_eq!(p.available_count() + p.active_count(), p.capacity());
+    }
+}

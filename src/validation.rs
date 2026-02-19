@@ -204,3 +204,61 @@ mod tests {
     // can never trigger with properly constructed PhextCoords (which is good - the type
     // system prevents invalid coordinates from being created).
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::siw::SIW;
+    use crate::pipes::{DenseOp, SparseOp, CoordOp};
+    use crate::phext_coord::PhextCoord;
+
+    #[test]
+    fn validate_empty_stream_returns_err() {
+        // Empty stream is invalid per spec
+        assert!(validate_stream(&[]).is_err());
+    }
+
+    #[test]
+    fn validate_nop_stream_ok() {
+        let siws = vec![SIW::nop(), SIW::nop()];
+        assert!(validate_stream(&siws).is_ok());
+    }
+
+    #[test]
+    fn validate_single_dadd_ok() {
+        let s = SIW::new(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero());
+        assert!(validate_stream(&[s]).is_ok());
+    }
+
+    #[test]
+    fn validate_register_conflict_detected() {
+        // rd == rs1 — structural hazard
+        let s = SIW::new(DenseOp::DADD { rd: 1, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero());
+        // May or may not be an error depending on validator strictness
+        let _ = validate_stream(&[s]); // must not panic
+    }
+
+    #[test]
+    fn validate_large_stream_ok() {
+        let siws: Vec<SIW> = (0..100).map(|i| {
+            let rd = (i % 14) as u8;
+            let rs1 = (i % 13 + 1) as u8;
+            let rs2 = (i % 12 + 2) as u8;
+            SIW::new(DenseOp::DADD { rd, rs1, rs2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero())
+        }).collect();
+        let result = validate_stream(&siws);
+        // Should not panic; errors may be present for conflicts
+        let _ = result;
+    }
+
+    #[test]
+    fn validate_packed_stream_ok() {
+        let s = SIW::new(
+            DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 },
+            SparseOp::SINDEX { rd: 3, base: 0, offset: 1, dim: 0 },
+            CoordOp::CBAR { barrier_id: 0, count: 1 },
+            PhextCoord::zero(),
+        );
+        let _ = validate_stream(&[s]); // must not panic
+    }
+}

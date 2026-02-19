@@ -195,3 +195,65 @@ mod tests {
         assert_eq!(mem::align_of::<SIW>(), 64);
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::pipes::{DenseOp, SparseOp, CoordOp};
+
+    #[test]
+    fn siw_size_is_cache_aligned() {
+        assert_eq!(std::mem::size_of::<SIW>() % 64, 0, "SIW must be cache-line aligned");
+    }
+
+    #[test]
+    fn siw_nop_mode_bits_zero() {
+        assert_eq!(SIW::nop().mode_bits(), 0);
+    }
+
+    #[test]
+    fn siw_d_active_mode_bit_0() {
+        let s = SIW::new(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero());
+        assert_eq!(s.mode_bits() & 0b001, 1);
+    }
+
+    #[test]
+    fn siw_s_active_mode_bit_1() {
+        let s = SIW::new(DenseOp::DNOP, SparseOp::SINDEX { rd: 0, base: 0, offset: 0, dim: 0 }, CoordOp::CNOP, PhextCoord::zero());
+        assert_eq!(s.mode_bits() & 0b010, 0b010);
+    }
+
+    #[test]
+    fn siw_c_active_mode_bit_2() {
+        let s = SIW::new(DenseOp::DNOP, SparseOp::SNOP, CoordOp::CBAR { barrier_id: 0, count: 1 }, PhextCoord::zero());
+        assert_eq!(s.mode_bits() & 0b100, 0b100);
+    }
+
+    #[test]
+    fn siw_with_deps_sets_flags() {
+        let s = SIW::nop().with_deps(0x05);
+        assert!(s.has_dependencies());
+        assert_eq!(s.deps, 0x05);
+    }
+
+    #[test]
+    fn siw_family_bytes_correct_for_packed() {
+        let s = SIW::new(
+            DenseOp::DFMA { rd: 0, rs1: 1, rs2: 2, rs3: 3 },
+            SparseOp::SGATHER { rd: 0, coord_idx: 0, width: 8 },
+            CoordOp::CPACK { rd: 0, rs1: 1, rs2: 2, fmt: crate::pipes::MessageFormat::Result },
+            PhextCoord::zero(),
+        );
+        assert_eq!(s.d_fam, 0, "DFMA = Arithmetic (0)");
+        assert_eq!(s.s_fam, 0, "SGATHER = Load (0)");
+        assert_eq!(s.c_fam, 0, "CPACK = Pack (0)");
+    }
+
+    #[test]
+    fn siw_clone_is_deep() {
+        let s1 = SIW::new(DenseOp::DADD { rd: 5, rs1: 6, rs2: 7 }, SparseOp::SNOP, CoordOp::CNOP, PhextCoord::zero());
+        let s2 = s1.clone();
+        assert_eq!(s1.d_op, s2.d_op);
+        assert_eq!(s1.d_fam, s2.d_fam);
+    }
+}

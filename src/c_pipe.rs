@@ -358,3 +358,63 @@ mod tests {
         assert_eq!(fuzzy_matches.len(), 2); // Both found
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::phext_coord::PhextCoord;
+    use crate::pipes::MessageFormat;
+
+    fn coord(x: u16) -> PhextCoord {
+        PhextCoord::new([x, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    }
+
+    fn do_send(c: &mut CPipeExecutor, addr: PhextCoord, val: i64) {
+        let _ = c.send(addr, 0, val, 0, MessageFormat::Result);
+    }
+
+    #[test]
+    fn cpipe_new_has_zero_messages() {
+        let c = CPipeExecutor::new();
+        assert_eq!(c.message_count(&coord(1)), 0);
+    }
+
+    #[test]
+    fn cpipe_send_increments_count() {
+        let mut c = CPipeExecutor::new();
+        let addr = coord(5);
+        do_send(&mut c, addr, 42);
+        assert_eq!(c.message_count(&coord(5)), 1);
+    }
+
+    #[test]
+    fn cpipe_send_multiple_same_coord() {
+        let mut c = CPipeExecutor::new();
+        do_send(&mut c, coord(3), 1);
+        do_send(&mut c, coord(3), 2);
+        assert_eq!(c.message_count(&coord(3)), 2);
+    }
+
+    #[test]
+    fn cpipe_clear_removes_all() {
+        let mut c = CPipeExecutor::new();
+        do_send(&mut c, coord(2), 99);
+        c.clear();
+        assert_eq!(c.message_count(&coord(2)), 0);
+    }
+
+    #[test]
+    fn cpipe_fuzzy_match_empty() {
+        let c = CPipeExecutor::new();
+        let target = coord(1);
+        let results = c.match_messages_fuzzy(&target, 1.0);
+        assert!(results.is_empty(), "no messages = no matches");
+    }
+
+    #[test]
+    fn cpipe_default_same_as_new() {
+        let c1 = CPipeExecutor::new();
+        let c2 = CPipeExecutor::default();
+        assert_eq!(c1.message_count(&coord(1)), c2.message_count(&coord(1)));
+    }
+}

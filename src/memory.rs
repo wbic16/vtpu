@@ -142,3 +142,58 @@ mod tests {
         assert_eq!(data, &[0xDE, 0xAD, 0xBE, 0xEF]);
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+    use crate::phext_coord::PhextCoord;
+
+    fn coord(x: u16) -> PhextCoord {
+        PhextCoord::new([x, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    }
+
+    #[test]
+    fn memory_gather_uninit_returns_zero() {
+        let mut m = Memory::new();
+        let v = m.gather_i64(&coord(42));
+        assert_eq!(v, 0, "unwritten address returns 0");
+    }
+
+    #[test]
+    fn memory_scatter_gather_roundtrip() {
+        let mut m = Memory::new();
+        let c = coord(7);
+        m.scatter_i64(&c, 12345);
+        assert_eq!(m.gather_i64(&c), 12345);
+    }
+
+    #[test]
+    fn memory_overwrite_updates_value() {
+        let mut m = Memory::new();
+        let c = coord(3);
+        m.scatter_i64(&c, 100);
+        m.scatter_i64(&c, 200);
+        assert_eq!(m.gather_i64(&c), 200);
+    }
+
+    #[test]
+    fn memory_different_coords_independent() {
+        let mut m = Memory::new();
+        m.scatter_i64(&coord(1), 111);
+        m.scatter_i64(&coord(2), 222);
+        assert_eq!(m.gather_i64(&coord(1)), 111);
+        assert_eq!(m.gather_i64(&coord(2)), 222);
+    }
+
+    #[test]
+    fn memory_capacity_nonzero() {
+        let m = Memory::new();
+        assert!(m.capacity() > 0, "default memory has capacity");
+    }
+
+    #[test]
+    fn memory_with_capacity_larger() {
+        let m = Memory::with_capacity(1024 * 1024);
+        assert!(m.capacity() >= 1024 * 1024);
+    }
+}

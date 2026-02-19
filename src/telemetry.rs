@@ -284,3 +284,60 @@ mod tests {
         assert!(json.contains("\"ops_per_cycle\": 3.00"));
     }
 }
+
+#[cfg(test)]
+mod w20_tests {
+    use super::*;
+
+    #[test]
+    fn telemetry_cache_hit_rates_all_zeros() {
+        let t = VtpuTelemetry::new();
+        let rates = t.cache_hit_rates();
+        // No accesses → 0% hit rate
+        assert_eq!(rates[0], 0.0);
+    }
+
+    #[test]
+    fn telemetry_record_and_retrieve_ops() {
+        let t = VtpuTelemetry::new();
+        t.record_ops(500);
+        t.record_ops(500);
+        assert_eq!(t.total_ops(), 1000);
+    }
+
+    #[test]
+    fn telemetry_record_cycles_tracks_correctly() {
+        let t = VtpuTelemetry::new();
+        t.record_cycles(400);
+        t.record_ops(1200);
+        assert!((t.ops_per_cycle() - 3.0).abs() < 0.01, "3 ops/cycle expected");
+    }
+
+    #[test]
+    fn telemetry_cache_miss_l1() {
+        let t = VtpuTelemetry::new();
+        t.record_cache_hit(0);
+        t.record_cache_hit(0);
+        t.record_cache_miss(0);
+        let rates = t.cache_hit_rates();
+        assert!((rates[0] - 2.0/3.0).abs() < 0.01, "2/3 hit rate at L1");
+    }
+
+    #[test]
+    fn telemetry_combined_hit_rate_single_level() {
+        let t = VtpuTelemetry::new();
+        t.record_cache_hit(0);
+        t.record_cache_hit(0);
+        let combined = t.combined_cache_hit_rate();
+        assert!(combined >= 0.0 && combined <= 1.0);
+    }
+
+    #[test]
+    fn telemetry_error_counter() {
+        let t = VtpuTelemetry::new();
+        t.record_error();
+        t.record_error();
+        // Errors recorded without panic
+        assert_eq!(t.total_ops(), 0, "errors don't count as ops");
+    }
+}
