@@ -100,6 +100,7 @@ pub use wedge::{Wedge, WedgeExecutor, SMT_THREADS, NODES_PER_WEDGE, TOTAL_NODES}
 pub use cognitive::{CognitiveEngine, CognitiveStep, CognitiveResult};
 pub mod pool;
 pub use pool::SentronPool;
+pub mod simd;
 pub mod topology;
 pub mod zuna;
 pub mod prefetch;

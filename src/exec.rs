@@ -322,11 +322,11 @@ pub fn exec_siw_octawire(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> 
     // If the SIW carries a non-zero phext coordinate, auto-load into phext[0].
     // This enables per-instruction addressing: each SIW targets its own coordinate.
     // Zero phext_addr means "use whatever phext[0] was pre-set" (existing test behavior).
-    // If the SIW carries a non-zero phext coordinate, auto-load into phext[0].
-    // Zero phext_addr = "use pre-set phext[0]" (backward-compatible with existing tests).
-    let addr = siw.phext_addr;
-    if addr != PhextCoord::zero() {
-        sentron.regs.phext[0] = addr;
+    // Auto-load phext[0] from the SIW's coordinate only when S or C pipes are active
+    // (they use phext addressing). Pure D-pipe SIWs skip this — saves 1 comparison
+    // + branch + possible cache miss per SIW on tight arithmetic loops.
+    if (siw.s_fam < 4 || siw.c_fam < 4) && siw.phext_addr != PhextCoord::zero() {
+        sentron.regs.phext[0] = siw.phext_addr;
     }
 
     // D-Pipe: 4-family indexed dispatch (family 4 = NOP, skip)
