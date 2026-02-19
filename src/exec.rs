@@ -5,6 +5,7 @@
 
 use crate::pipes::{DenseOp, SparseOp, CoordOp, ReductionOp};
 use crate::memory::Memory;
+use crate::phext_coord::PhextCoord;
 use crate::sentron::{Sentron, SentronState};
 use crate::siw::SIW;
 
@@ -317,6 +318,16 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
 #[inline(always)]
 pub fn exec_siw_octawire(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
     let mut active = 0u8;
+
+    // If the SIW carries a non-zero phext coordinate, auto-load into phext[0].
+    // This enables per-instruction addressing: each SIW targets its own coordinate.
+    // Zero phext_addr means "use whatever phext[0] was pre-set" (existing test behavior).
+    // If the SIW carries a non-zero phext coordinate, auto-load into phext[0].
+    // Zero phext_addr = "use pre-set phext[0]" (backward-compatible with existing tests).
+    let addr = siw.phext_addr;
+    if addr != PhextCoord::zero() {
+        sentron.regs.phext[0] = addr;
+    }
 
     // D-Pipe: 4-family indexed dispatch (family 4 = NOP, skip)
     if siw.d_fam < 4 {
