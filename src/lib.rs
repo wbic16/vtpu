@@ -66,6 +66,7 @@ pub mod sentron;
 pub mod neuron;
 pub mod exec;
 pub mod simd;
+pub mod sq;
 pub mod smt;
 pub mod hdc;
 pub mod hdc_optimized;
