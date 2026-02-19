@@ -15,7 +15,7 @@ A software-defined accelerator with sentron-native instruction scheduling and ph
 | 3 — Compiler | W29–W35 | ⬜ |
 | 4 — Launch | W36–W40 | ⬜ |
 
-**319 tests. ~17K LOC. Zero deps.**
+**349 tests. ~18K LOC. Zero deps.**
 
 ## Benchmarks (Zen 4 8945HS, release)
 

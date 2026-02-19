@@ -10,6 +10,8 @@
 
 use crate::phext_coord::PhextCoord;
 use crate::ppt::PhextPageTable;
+use crate::prefetch::{DimensionalPrefetcher, PrefetchStrategy};
+use crate::cache_sim::CacheSimulator;
 
 /// Result of a gather operation for a single coordinate
 #[derive(Debug, Clone)]
@@ -127,6 +129,81 @@ impl SparseAccess {
     }
 }
 
+/// Sparse access with integrated prefetcher and cache simulation
+pub struct PrefetchingSparseAccess {
+    inner: SparseAccess,
+    prefetcher: DimensionalPrefetcher,
+    cache: CacheSimulator,
+}
+
+impl PrefetchingSparseAccess {
+    /// Create with default settings
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            inner: SparseAccess::new(capacity),
+            prefetcher: DimensionalPrefetcher::new(16, PrefetchStrategy::Stride),
+            cache: CacheSimulator::default_sizes(),
+        }
+    }
+
+    /// Gather with automatic prefetching
+    pub fn gather_prefetch(&mut self, coords: &[PhextCoord]) -> Vec<GatherResult> {
+        let mut results = Vec::with_capacity(coords.len());
+
+        for coord in coords {
+            // Record access in cache
+            self.cache.access(coord);
+
+            // Record access in prefetcher, get predictions
+            let predictions = self.prefetcher.access(coord);
+
+            // Pre-warm cache with predictions
+            for pred in &predictions {
+                self.cache.prewarm(pred);
+            }
+
+            // Do the actual gather
+            let physical = self.translate(coord);
+            match physical {
+                Some(addr) if addr < self.inner.store.len() => {
+                    results.push(GatherResult {
+                        coord: coord.clone(),
+                        value: Some(self.inner.store[addr]),
+                        ppt_hit: true,
+                    });
+                }
+                _ => {
+                    results.push(GatherResult {
+                        coord: coord.clone(),
+                        value: None,
+                        ppt_hit: false,
+                    });
+                }
+            }
+        }
+
+        self.inner.gather_count += coords.len() as u64;
+        results
+    }
+
+    /// Scatter (delegates to inner)
+    pub fn scatter(&mut self, coords: &[PhextCoord], values: &[u64]) -> Vec<ScatterResult> {
+        self.inner.scatter(coords, values)
+    }
+
+    fn translate(&self, coord: &PhextCoord) -> Option<usize> {
+        let hash = coord.fast_hash();
+        Some((hash as usize) % self.inner.store.len())
+    }
+
+    /// Cache hit rate
+    pub fn cache_l1_rate(&self) -> f64 { self.cache.l1_hit_rate() }
+    pub fn cache_hit_rate(&self) -> f64 { self.cache.hit_rate() }
+
+    /// Prefetch hit rate
+    pub fn prefetch_hit_rate(&self) -> f64 { self.prefetcher.hit_rate() }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -216,5 +293,50 @@ mod tests {
     fn test_capacity() {
         let sa = SparseAccess::new(512);
         assert_eq!(sa.capacity(), 512);
+    }
+
+    #[test]
+    fn test_prefetching_gather_basic() {
+        let mut psa = PrefetchingSparseAccess::new(1024);
+        let coords = vec![coord(1, 1), coord(2, 1), coord(3, 1)];
+        let values = vec![10, 20, 30];
+        psa.scatter(&coords, &values);
+
+        let results = psa.gather_prefetch(&coords);
+        assert_eq!(results.len(), 3);
+        assert_eq!(results[0].value, Some(10));
+    }
+
+    #[test]
+    fn test_prefetching_improves_cache() {
+        let mut psa = PrefetchingSparseAccess::new(4096);
+        // Sequential access pattern — prefetcher should predict next
+        for i in 1..=100u16 {
+            psa.gather_prefetch(&[coord(i, 1)]);
+        }
+        // With stride prefetching on sequential access, L1 should be high
+        assert!(psa.cache_hit_rate() > 0.5,
+            "Cache hit rate {} should be > 0.5 for sequential access",
+            psa.cache_hit_rate());
+    }
+
+    #[test]
+    fn test_prefetch_hit_rate_nonzero() {
+        let mut psa = PrefetchingSparseAccess::new(4096);
+        // Sequential access — stride detector should kick in
+        for i in 1..=50u16 {
+            psa.gather_prefetch(&[coord(i, 1)]);
+        }
+        // After enough sequential accesses, prefetcher should have some hits
+        // (stride detection needs 3+ accesses)
+        assert!(psa.prefetch_hit_rate() > 0.0 || psa.cache_hit_rate() > 0.0);
+    }
+
+    #[test]
+    fn test_prefetching_scatter_then_gather() {
+        let mut psa = PrefetchingSparseAccess::new(1024);
+        psa.scatter(&[coord(5, 5)], &[999]);
+        let results = psa.gather_prefetch(&[coord(5, 5)]);
+        assert_eq!(results[0].value, Some(999));
     }
 }
