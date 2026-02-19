@@ -375,16 +375,34 @@ fn exec_d_family(sentron: &mut Sentron, siw: &SIW) -> u8 {
     }
 }
 
-/// S-pipe family dispatch — takes &mut Memory so can't use a single const table.
-/// Split into two halves: address/route (no mem) and load/store (needs mem).
+/// S-pipe dispatch table: 4 families, const function pointer array.
+/// Address (fam 2) and Route (fam 3) don't use Memory; wrapper fns absorb the
+/// unused `mem` parameter so all 4 entries share the same SMemHandler signature.
+/// LLVM sees a simple index load + indirect call — no branch tree.
+type SMemHandler = fn(&mut Sentron, &SIW, &mut Memory) -> u8;
+
+#[inline(always)]
+fn exec_s_address_wrap(sentron: &mut Sentron, siw: &SIW, _mem: &mut Memory) -> u8 {
+    exec_s_address(sentron, siw)
+}
+#[inline(always)]
+fn exec_s_route_wrap(sentron: &mut Sentron, siw: &SIW, _mem: &mut Memory) -> u8 {
+    exec_s_route(sentron, siw)
+}
+
+const S_TABLE: [SMemHandler; 4] = [
+    exec_s_load,          // Family 0: SGATHER, SDEDUP
+    exec_s_store,         // Family 1: SSCATTR, SFLUSH
+    exec_s_address_wrap,  // Family 2: SINDEX, SALLOC, SFREE
+    exec_s_route_wrap,    // Family 3: SPREFCH, SASSOC, SROUTE, SNEIGHBR
+];
+
 #[inline(always)]
 fn exec_s_family(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
-    match siw.s_fam {
-        0 => exec_s_load(sentron, siw, mem),
-        1 => exec_s_store(sentron, siw, mem),
-        2 => exec_s_address(sentron, siw),
-        3 => exec_s_route(sentron, siw),
-        _ => 0,
+    if (siw.s_fam as usize) < S_TABLE.len() {
+        S_TABLE[siw.s_fam as usize](sentron, siw, mem)
+    } else {
+        0
     }
 }
 
