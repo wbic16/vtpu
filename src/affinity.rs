@@ -223,7 +223,7 @@ pub fn cache_sizes() -> (usize, usize, usize) {
 /// On x86: PAUSE instruction (saves power, signals spinwait).
 pub fn yield_hint() {
     #[cfg(target_arch = "x86_64")]
-    unsafe { core::arch::x86_64::_mm_pause(); }
+    core::arch::x86_64::_mm_pause();
 
     #[cfg(not(target_arch = "x86_64"))]
     std::thread::yield_now();
