@@ -67,6 +67,7 @@ pub mod neuron;
 pub mod exec;
 pub mod simd;
 pub mod sq;
+pub mod base256;
 pub mod smt;
 pub mod hdc;
 pub mod hdc_optimized;
