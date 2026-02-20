@@ -184,6 +184,17 @@ pub fn detect_topology() -> Vec<(usize, usize, usize)> {
             .unwrap_or(0);
         result.push((i, core_id, numa));
     }
+
+    // Fallback for non-Linux (Windows, macOS): synthesize from logical CPU count
+    if result.is_empty() {
+        let logical = num_cpus();
+        let physical = num_physical_cores();
+        for i in 0..logical {
+            let core_id = i % physical;
+            result.push((i, core_id, 0));
+        }
+    }
+
     result
 }
 
@@ -205,6 +216,7 @@ pub fn smt_pairs() -> Vec<(usize, usize)> {
 }
 
 /// L1/L2/L3 cache sizes from sysfs (in KB).
+/// Falls back to conservative defaults on non-Linux platforms.
 pub fn cache_sizes() -> (usize, usize, usize) {
     let read_kb = |idx: usize| -> usize {
         let path = format!("/sys/devices/system/cpu/cpu0/cache/index{}/size", idx);
@@ -216,7 +228,13 @@ pub fn cache_sizes() -> (usize, usize, usize) {
             })
             .unwrap_or(0)
     };
-    (read_kb(0), read_kb(2), read_kb(3)) // index0=L1d, index2=L2, index3=L3
+    let (l1, l2, l3) = (read_kb(0), read_kb(2), read_kb(3)); // index0=L1d, index2=L2, index3=L3
+
+    // Fallback: conservative defaults if sysfs unavailable (Windows, macOS)
+    let l1 = if l1 > 0 { l1 } else { 32 };      // 32 KB L1d
+    let l2 = if l2 > 0 { l2 } else { 1024 };     // 1 MB L2
+    let l3 = if l3 > 0 { l3 } else { 16384 };    // 16 MB L3
+    (l1, l2, l3)
 }
 
 /// Thread yield hint — cooperate with the OS scheduler.
