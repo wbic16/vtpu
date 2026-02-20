@@ -5,3 +5,4 @@ benchmarks/cache/random_access
 benchmarks/cache/coordinate_patterns
 Cargo.lock
 *.theia-backup
+perf.data
