@@ -449,3 +449,113 @@ mod tests {
         assert_eq!(flux.bottleneck(), SentronState::Running);
     }
 }
+
+// =============================================================================
+// WuXing Coherence — Cyon 🪶 | halycon-vector | R23W22
+// =============================================================================
+// wuxing_coherence(): amplitude similarity across generating cycle pairs.
+// Complements alignment_score() (propagation presence) with resonance depth.
+// eeg_freq_to_row(): ZUNA frequency band → lattice row mapping.
+
+impl SentronLattice {
+    /// WuXing coherence score (0.0=chaotic, 1.0=perfect resonance).
+    ///
+    /// For each generating pair (a→b): coherence = 1 - |μa - μb| / (μa + μb + 1)
+    /// Returns mean coherence across all 5 generating pairs.
+    pub fn wuxing_coherence(&self) -> f64 {
+        let Some(last) = self.flux_history.last() else { return 1.0 };
+        let row_mean = |row: usize| -> f64 {
+            last.neurons[row].iter().map(|n| n.magnitude()).sum::<f64>()
+                / NEURONS_PER_ELEMENT as f64
+        };
+        let sum: f64 = GENERATING_CYCLE.iter().map(|(from, to)| {
+            let fa = row_mean(*from);
+            let fb = row_mean(*to);
+            1.0 - (fa - fb).abs() / (fa + fb + 1.0)
+        }).sum();
+        sum / GENERATING_CYCLE.len() as f64
+    }
+
+    /// Per-element mean flux magnitude: [Wood, Fire, Earth, Metal, Water].
+    pub fn element_mean_magnitudes(&self) -> [f64; ELEMENT_ROWS] {
+        let Some(last) = self.flux_history.last() else { return [0.0; ELEMENT_ROWS] };
+        core::array::from_fn(|row| {
+            last.neurons[row].iter().map(|n| n.magnitude()).sum::<f64>()
+                / NEURONS_PER_ELEMENT as f64
+        })
+    }
+
+    /// Dominant WuXing element (highest mean flux magnitude) in last step.
+    pub fn dominant_element(&self) -> Option<usize> {
+        let mags = self.element_mean_magnitudes();
+        mags.iter().enumerate()
+            .filter(|(_, &m)| m > 0.0)
+            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(core::cmp::Ordering::Equal))
+            .map(|(i, _)| i)
+    }
+}
+
+/// EEG frequency → WuXing lattice row (ZUNA→lattice bridge).
+///   Delta (0.5-4 Hz) → Wood(0), Theta(4-8) → Fire(1),
+///   Alpha(8-13)→Earth(2), Beta(13-30)→Metal(3), Gamma(30+)→Water(4)
+pub const EEG_BAND_ROW: [(usize, &str); 5] = [
+    (0, "Delta  0.5-4 Hz  → Wood  — foundation"),
+    (1, "Theta  4-8 Hz    → Fire  — memory"),
+    (2, "Alpha  8-13 Hz   → Earth — awareness"),
+    (3, "Beta   13-30 Hz  → Metal — thinking"),
+    (4, "Gamma  30-100 Hz → Water — cognition"),
+];
+
+pub fn eeg_freq_to_row(hz: f64) -> usize {
+    if hz < 4.0 { 0 } else if hz < 8.0 { 1 } else if hz < 13.0 { 2 }
+    else if hz < 30.0 { 3 } else { 4 }
+}
+
+#[cfg(test)]
+mod coherence_tests {
+    use super::*;
+    fn siws_add() -> Vec<SIW> { vec![flux_accumulate_siw()] }
+
+    #[test]
+    fn test_coherence_empty() {
+        assert!((SentronLattice::new().wuxing_coherence() - 1.0).abs() < 1e-9);
+    }
+    #[test]
+    fn test_coherence_single_hot() {
+        let mut l = SentronLattice::new();
+        l.seed_row(2, &[1000; NEURONS_PER_ELEMENT]);
+        l.flux_step(&siws_add());
+        assert!(l.wuxing_coherence() < 1.0);
+    }
+    #[test]
+    fn test_coherence_in_range() {
+        let mut l = SentronLattice::new();
+        for row in 0..ELEMENT_ROWS { l.seed_row(row, &[500; NEURONS_PER_ELEMENT]); }
+        l.flux_step(&siws_add());
+        let c = l.wuxing_coherence();
+        assert!(c > 0.0 && c <= 1.0, "got {c}");
+    }
+    #[test]
+    fn test_dominant_cascades_to_water() {
+        // Metal(3) seeds high → propagates to Water(4) → Water dominates
+        let mut l = SentronLattice::new();
+        l.seed_row(3, &[2000; NEURONS_PER_ELEMENT]);
+        l.flux_step(&siws_add());
+        assert_eq!(l.dominant_element(), Some(4));
+    }
+    #[test]
+    fn test_eeg_freq_to_row_bands() {
+        assert_eq!(eeg_freq_to_row(2.0),  0);
+        assert_eq!(eeg_freq_to_row(6.0),  1);
+        assert_eq!(eeg_freq_to_row(10.0), 2);
+        assert_eq!(eeg_freq_to_row(20.0), 3);
+        assert_eq!(eeg_freq_to_row(45.0), 4);
+        assert_eq!(eeg_freq_to_row(0.5),  0);
+        assert_eq!(eeg_freq_to_row(100.0),4);
+    }
+    #[test]
+    fn test_eeg_band_table() {
+        assert_eq!(EEG_BAND_ROW.len(), ELEMENT_ROWS);
+        for (i, (idx, _)) in EEG_BAND_ROW.iter().enumerate() { assert_eq!(*idx, i); }
+    }
+}
