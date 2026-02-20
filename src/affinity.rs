@@ -323,6 +323,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn topology_detection() {
         let topo = detect_topology();
         assert!(!topo.is_empty(), "Should detect at least one CPU");
@@ -331,6 +332,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn smt_pairs_detected() {
         let pairs = smt_pairs();
         let physical = num_physical_cores();
@@ -341,6 +343,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_os = "linux")]
     fn cache_detection() {
         let (l1, l2, _l3) = cache_sizes();
         // Zen 4: L1=32K, L2=1024K, L3=16384K
