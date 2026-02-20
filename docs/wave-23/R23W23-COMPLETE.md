@@ -87,8 +87,8 @@ base256 table
 
 ## Examples
 
-### Byte Encodings (Corrected from Spec)
-Original spec had hand-calculation errors. Corrected values:
+### Byte Encodings (After Character Set Sync)
+Phex's original spec used INITIALS with 'z' at index 15. Sibling's implementation uses 'w' (swapped 'j'↔'z'). Character sets merged to sibling's version (better cross-language clarity).
 
 | Byte   | Syllable | Breakdown |
 |--------|----------|-----------|
@@ -96,21 +96,19 @@ Original spec had hand-calculation errors. Corrected values:
 | 0x01   | bad      | b(0) + a(0) + d(1) |
 | 0x0F   | bom      | b(0) + o(3) + m(3) |
 | 0x10   | dac      | d(1) + a(0) + c(0) |
-| 0x46   | hef      | h(4) + e(1) + f(2) *(was incorrectly 0x42 in spec)* |
-| 0xA5   | red      | r(10) + e(1) + d(1) |
-| 0xCA   | tif      | t(12) + i(2) + f(2) |
-| 0xFF   | zom      | z(15) + o(3) + m(3) |
+| 0x42   | hef      | h(4) + e(1) + f(2) |
+| 0xA5   | ped      | p(10) + e(1) + d(1) |
+| 0xCA   | sif      | s(12) + i(2) + f(2) |
+| 0xFF   | wom      | w(15) + o(3) + m(3) |
 
-### Phext Coordinate (Corrected)
+### Phext Coordinate (Final)
 Coordinate: `1.5.2/3.7.3/9.1.1`  
 Bytes (low byte of each u16 dim): `[0x01, 0x05, 0x02, 0x03, 0x07, 0x03, 0x09, 0x01, 0x01]`  
-Phonetic: **`bad-bed-baf / bam-bem-bam / bid-bad-bad`**
-
-*(Spec originally claimed "bag-bem-bag / bif-bad-bad" — but 'g' is not a final consonant. Corrected.)*
+Phonetic: **`bad bed baf / bam bem bam / bid bad bad`** (space-separated)
 
 ### SHA256 Hash (first 4 bytes)
-Hash: `d2a84f3c...`  
-Phonetic: `vif-ric-him-goc`
+Hash: `d2a84f3c...` = `[0xD2, 0xA8, 0x4F, 0x3C]`  
+Phonetic (space-separated): `dif pic hom gac` (using new character sets)
 
 ---
 

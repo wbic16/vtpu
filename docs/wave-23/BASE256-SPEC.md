@@ -52,14 +52,14 @@ Total combinations: 16 × 4 × 4 = **256** (exact coverage)
 #### Initial Consonants (16)
 Position 0–15 in byte value's upper nibble:
 ```
-b, d, f, g, h, k, l, m, n, p, r, s, t, v, w, z
+b, d, f, g, h, j, k, l, m, n, p, r, s, t, v, w
 ```
 
 Selection criteria:
 - Present in IPA basic consonants
 - Unambiguous in noisy conditions (avoid th/dh confusion)
 - No affricates (ch, dz) — simplicity
-- No palatals (ñ, j) — cross-language availability
+- Palatal 'j' preferred over velar 'z' for cross-language clarity
 
 #### Vowels (4)
 Position 0–3 in byte value's middle 2 bits (bits 2-3):
@@ -119,17 +119,17 @@ byte = (initial_index << 4) | (vowel_index << 2) | final_index
 | 0x2   | f    | 0x20–0x2F  |
 | 0x3   | g    | 0x30–0x3F  |
 | 0x4   | h    | 0x40–0x4F  |
-| 0x5   | k    | 0x50–0x5F  |
-| 0x6   | l    | 0x60–0x6F  |
-| 0x7   | m    | 0x70–0x7F  |
-| 0x8   | n    | 0x80–0x8F  |
-| 0x9   | p    | 0x90–0x9F  |
-| 0xA   | r    | 0xA0–0xAF  |
-| 0xB   | s    | 0xB0–0xBF  |
-| 0xC   | t    | 0xC0–0xCF  |
-| 0xD   | v    | 0xD0–0xDF  |
-| 0xE   | w    | 0xE0–0xEF  |
-| 0xF   | z    | 0xF0–0xFF  |
+| 0x5   | j    | 0x50–0x5F  |
+| 0x6   | k    | 0x60–0x6F  |
+| 0x7   | l    | 0x70–0x7F  |
+| 0x8   | m    | 0x80–0x8F  |
+| 0x9   | n    | 0x90–0x9F  |
+| 0xA   | p    | 0xA0–0xAF  |
+| 0xB   | r    | 0xB0–0xBF  |
+| 0xC   | s    | 0xC0–0xCF  |
+| 0xD   | t    | 0xD0–0xDF  |
+| 0xE   | v    | 0xE0–0xEF  |
+| 0xF   | w    | 0xF0–0xFF  |
 
 #### VOWELS[4]
 | Index | Char | Bit Pattern |
@@ -158,15 +158,15 @@ byte = (initial_index << 4) | (vowel_index << 2) | final_index
 0x0F = b(0) o(3) m(3) = "bom"
 0x10 = d(1) a(0) c(0) = "dac"
 0x42 = h(4) e(1) f(2) = "hef"
-0xA5 = r(A) e(1) d(1) = "red"
-0xCA = t(C) i(2) f(2) = "tif"
-0xFF = z(F) o(3) m(3) = "zom"
+0xA5 = p(A) e(1) d(1) = "ped"
+0xCA = s(C) i(2) f(2) = "sif"
+0xFF = w(F) o(3) m(3) = "wom"
 ```
 
 ### 5.2 Phext Coordinate
 Coordinate: `1.5.2/3.7.3/9.1.1`  
 As bytes (1-indexed, 16-bit per dim): `[0x01, 0x05, 0x02, 0x03, 0x07, 0x03, 0x09, 0x01, 0x01]`  
-Phonetic: `"bad bec baf / bag bic bag / bif bad bad"`
+Phonetic: `"bad-bed-baf / bam-bem-bam / bid-bad-bad"`
 
 ### 5.3 SHA256 Hash (first 4 bytes)
 Hash: `d2a84f3c...`  
@@ -210,9 +210,9 @@ IDs and coordinates decoded, cryptographic verification proceeds.
 | baf      | /bæf/      | "baff"            |
 | bam      | /bæm/      | "bam"             |
 | hef      | /hɛf/      | "heff"            |
-| red      | /rɛd/      | "red"             |
-| tif      | /tɪf/      | "tiff"            |
-| zom      | /zoʊm/     | "zome" (rhymes with "home") |
+| ped      | /pɛd/      | "ped"             |
+| sif      | /sɪf/      | "siff"            |
+| wom      | /woʊm/     | "wome" (rhymes with "home") |
 
 ### 7.2 Stress and Rhythm
 - All syllables are **unstressed** (monotone)
@@ -282,8 +282,14 @@ Example: `"bac-def-ghi"` and `"bacdefghi"` both decode to `[0x00, 0x11, 0x38]`.
 
 ## 12. Changelog
 
+**v0.2 (2026-02-19)** — Implementation sync (Phex)
+- Updated INITIALS: 'z'→'w' at index 15; 'k'→'k' at index 6; 'j' added at index 5
+- Rationale: Cross-language availability; 'j' is clear palatal, 'w' is velar glide
+- Regenerated examples to reflect actual implementation
+- All 515 unit tests passing
+
 **v0.1 (2026-02-19)** — Initial draft (Phex)
 - Defined 16×4×4 structure
-- Selected character sets
+- Selected character sets (original with 'z')
 - Specified encoding/decoding algorithms
 - Provided examples and test requirements

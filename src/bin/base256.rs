@@ -7,7 +7,7 @@
 //!   base256 table               Print full lookup table
 
 use std::env;
-use vtpu_runtime::base256::{encode, decode, decode_sequence, format_bytes};
+use vtpu_runtime::base256::{encode, encode_byte_str, decode};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -90,12 +90,13 @@ fn cmd_encode(hex: &str) {
         }
     }
 
-    let syllables = format_bytes(&bytes);
-    println!("{}", syllables);
+    // Sibling's encode() returns space-separated
+    let space_sep = encode(&bytes);
+    println!("{}", space_sep);
 }
 
 fn cmd_decode(input: &str) {
-    match decode_sequence(input) {
+    match decode(input) {
         Some(bytes) => {
             let hex: String = bytes.iter().map(|b| format!("{:02X}", b)).collect::<Vec<_>>().join("");
             println!("{}", hex);
@@ -137,13 +138,13 @@ fn cmd_coord(coord_str: &str) {
 
     // Encode each dimension's low byte
     let bytes: Vec<u8> = dims.iter().map(|&d| d as u8).collect();
-    let syllables: Vec<String> = bytes.iter().map(|&b| encode(b)).collect();
+    let syllables: Vec<String> = bytes.iter().map(|&b| encode_byte_str(b)).collect();
     
-    // Format as 3 groups
+    // Format as 3 groups (space-separated within groups, slash-separated between groups)
     let formatted = format!("{} / {} / {}",
-        syllables[0..3].join("-"),
-        syllables[3..6].join("-"),
-        syllables[6..9].join("-")
+        syllables[0..3].join(" "),
+        syllables[3..6].join(" "),
+        syllables[6..9].join(" ")
     );
     
     println!("{}", formatted);
@@ -156,7 +157,7 @@ fn cmd_table() {
     println!("|------|-----|------------|----------|");
     
     for byte in 0u8..=255u8 {
-        let syllable = encode(byte);
+        let syllable = encode_byte_str(byte);
         let binary = format!("{:08b}", byte);
         println!("| {:02X}   | {:3} | {} | {:8} |", byte, byte, binary, syllable);
     }
