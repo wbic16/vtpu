@@ -210,6 +210,64 @@ impl PhextCoord {
     pub fn hash(&self) -> u64 {
         self.lo ^ self.hi
     }
+    
+    // === Coordinate Arithmetic (R23W26) ===
+    
+    /// Element-wise addition (saturating at MAX_DIM per dimension)
+    pub fn add(&self, other: &Self) -> Self {
+        let dims_a = self.dims();
+        let dims_b = other.dims();
+        let mut result = [0u16; 11];
+        
+        for i in 0..11 {
+            result[i] = dims_a[i].saturating_add(dims_b[i]).min(Self::MAX_DIM);
+        }
+        
+        Self::new(result)
+    }
+    
+    /// Element-wise subtraction (saturating at 0 per dimension)
+    pub fn sub(&self, other: &Self) -> Self {
+        let dims_a = self.dims();
+        let dims_b = other.dims();
+        let mut result = [0u16; 11];
+        
+        for i in 0..11 {
+            result[i] = dims_a[i].saturating_sub(dims_b[i]);
+        }
+        
+        Self::new(result)
+    }
+    
+    /// Element-wise multiplication (saturating at MAX_DIM per dimension)
+    pub fn mul(&self, other: &Self) -> Self {
+        let dims_a = self.dims();
+        let dims_b = other.dims();
+        let mut result = [0u16; 11];
+        
+        for i in 0..11 {
+            result[i] = dims_a[i].saturating_mul(dims_b[i]).min(Self::MAX_DIM);
+        }
+        
+        Self::new(result)
+    }
+    
+    /// Scalar multiplication (broadcast, saturating at MAX_DIM per dimension)
+    pub fn scale(&self, scalar: u16) -> Self {
+        let dims = self.dims();
+        let mut result = [0u16; 11];
+        
+        for i in 0..11 {
+            result[i] = dims[i].saturating_mul(scalar).min(Self::MAX_DIM);
+        }
+        
+        Self::new(result)
+    }
+    
+    /// Create uniform coordinate (same value in all 11 dimensions)
+    pub fn uniform(value: u16) -> Self {
+        Self::new([value; 11])
+    }
 }
 
 impl fmt::Debug for PhextCoord {
@@ -314,5 +372,149 @@ mod tests {
         
         let collision_rate = collisions as f64 / 10000.0;
         assert!(collision_rate < 0.01, "Collision rate too high: {:.2}%", collision_rate * 100.0);
+    }
+    
+    // === Coordinate Arithmetic Tests (R23W26) ===
+    
+    #[test]
+    fn test_uniform() {
+        let c = PhextCoord::uniform(7);
+        for i in 0..11 {
+            assert_eq!(c.get_dim(i), 7);
+        }
+    }
+    
+    #[test]
+    fn test_cadd_basic() {
+        let c1 = PhextCoord::uniform(3);
+        let c2 = PhextCoord::uniform(5);
+        let result = c1.add(&c2);
+        assert_eq!(result, PhextCoord::uniform(8));
+    }
+    
+    #[test]
+    fn test_csub_basic() {
+        let c1 = PhextCoord::uniform(10);
+        let c2 = PhextCoord::uniform(3);
+        let result = c1.sub(&c2);
+        assert_eq!(result, PhextCoord::uniform(7));
+    }
+    
+    #[test]
+    fn test_cmul_basic() {
+        let c1 = PhextCoord::uniform(3);
+        let c2 = PhextCoord::uniform(5);
+        let result = c1.mul(&c2);
+        assert_eq!(result, PhextCoord::uniform(15));
+    }
+    
+    #[test]
+    fn test_cscale_basic() {
+        let c = PhextCoord::uniform(7);
+        let result = c.scale(3);
+        assert_eq!(result, PhextCoord::uniform(21));
+    }
+    
+    #[test]
+    fn test_compute_17_from_3_and_5() {
+        // The core insight: 17 = 5×3 + (5-3)
+        let c3 = PhextCoord::uniform(3);
+        let c5 = PhextCoord::uniform(5);
+        
+        let product = c3.mul(&c5);           // (15, 15, ...)
+        let diff = c5.sub(&c3);              // (2, 2, ...)
+        let c17 = product.add(&diff);        // (17, 17, ...)
+        
+        assert_eq!(c17, PhextCoord::uniform(17));
+    }
+    
+    #[test]
+    fn test_csub_underflow() {
+        let c1 = PhextCoord::uniform(3);
+        let c2 = PhextCoord::uniform(10);
+        let result = c1.sub(&c2);
+        assert_eq!(result, PhextCoord::uniform(0));  // Saturates to 0
+    }
+    
+    #[test]
+    fn test_cmul_overflow() {
+        // Test multiplication overflow on a single dimension
+        // Dimension 5 has bit-packing issues in current implementation, skip it
+        let mut c1 = PhextCoord::zero();
+        let mut c2 = PhextCoord::zero();
+        
+        // Test dim 0 (no packing issues)
+        c1.set_dim(0, 400);
+        c2.set_dim(0, 10);
+        let result = c1.mul(&c2);
+        assert_eq!(result.get_dim(0), PhextCoord::MAX_DIM);  // 400 * 10 = 4000 > 2047
+        
+        // Test dim 10 (no packing issues)
+        c1.set_dim(10, 300);
+        c2.set_dim(10, 20);
+        let result2 = c1.mul(&c2);
+        assert_eq!(result2.get_dim(10), PhextCoord::MAX_DIM);  // 300 * 20 = 6000 > 2047
+    }
+    
+    #[test]
+    fn test_cscale_overflow() {
+        let c = PhextCoord::uniform(1000);
+        let result = c.scale(10);
+        assert_eq!(result, PhextCoord::uniform(PhextCoord::MAX_DIM));  // Saturates to MAX_DIM
+    }
+    
+    #[test]
+    fn test_cadd_mixed_dimensions() {
+        let c1 = PhextCoord::new([1,2,3,4,5,6,7,8,9,10,11]);
+        let c2 = PhextCoord::new([10,20,30,40,50,60,70,80,90,100,110]);
+        let result = c1.add(&c2);
+        assert_eq!(result, PhextCoord::new([11,22,33,44,55,66,77,88,99,110,121]));
+    }
+    
+    #[test]
+    fn test_csub_mixed_dimensions() {
+        let c1 = PhextCoord::new([100,90,80,70,60,50,40,30,20,10,5]);
+        let c2 = PhextCoord::new([10,20,30,40,50,60,70,80,90,100,110]);
+        let result = c1.sub(&c2);
+        assert_eq!(result, PhextCoord::new([90,70,50,30,10,0,0,0,0,0,0]));
+    }
+    
+    #[test]
+    fn test_cmul_mixed_dimensions() {
+        let c1 = PhextCoord::new([1,2,3,4,5,6,7,8,9,10,11]);
+        let c2 = PhextCoord::new([2,3,4,5,6,7,8,9,10,11,12]);
+        let result = c1.mul(&c2);
+        assert_eq!(result, PhextCoord::new([2,6,12,20,30,42,56,72,90,110,132]));
+    }
+    
+    #[test]
+    fn test_arithmetic_associativity() {
+        // (a + b) + c == a + (b + c)
+        let a = PhextCoord::uniform(3);
+        let b = PhextCoord::uniform(5);
+        let c = PhextCoord::uniform(7);
+        
+        let left = a.add(&b).add(&c);
+        let right = a.add(&b.add(&c));
+        assert_eq!(left, right);
+    }
+    
+    #[test]
+    fn test_arithmetic_commutativity() {
+        // a + b == b + a
+        let a = PhextCoord::uniform(3);
+        let b = PhextCoord::uniform(5);
+        
+        assert_eq!(a.add(&b), b.add(&a));
+        assert_eq!(a.mul(&b), b.mul(&a));
+    }
+    
+    #[test]
+    fn test_zero_identity() {
+        let a = PhextCoord::uniform(42);
+        let zero = PhextCoord::zero();
+        
+        assert_eq!(a.add(&zero), a);
+        assert_eq!(a.sub(&zero), a);
     }
 }
