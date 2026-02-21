@@ -68,6 +68,7 @@ pub mod exec;
 pub mod simd;
 pub mod sq;
 pub mod base256;
+pub mod base256_ops;
 pub mod smt;
 pub mod hdc;
 pub mod hdc_optimized;
