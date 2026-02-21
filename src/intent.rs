@@ -394,4 +394,142 @@ mod tests {
     fn whitespace_only() {
         assert_eq!(parse_intent("   "), Command::Unknown(String::new()));
     }
+
+    // === Edge cases: incomplete commands ===
+
+    #[test]
+    fn sentron_no_id() {
+        // "sentron" alone with no number — should still parse as sentron 0 (default)
+        assert_eq!(parse_intent("sentron"), Command::Sentron(0));
+    }
+
+    #[test]
+    fn encode_empty_text() {
+        // "encode" with no text
+        assert_eq!(parse_intent("encode"), Command::Encode(String::new()));
+    }
+
+    #[test]
+    fn decode_empty() {
+        assert_eq!(parse_intent("decode"), Command::Decode(String::new()));
+    }
+
+    #[test]
+    fn run_zero() {
+        assert_eq!(parse_intent("run 0"), Command::Run(0));
+    }
+
+    #[test]
+    fn run_large() {
+        // Should parse without panic
+        assert_eq!(parse_intent("run 999999"), Command::Run(999999));
+    }
+
+    // === Edge cases: injection attempts (should be harmless) ===
+
+    #[test]
+    fn semicolon_injection() {
+        // Should not execute anything dangerous — just treated as text
+        let cmd = parse_intent("status; rm -rf /");
+        // Either parses as status (ignoring the rest) or as unknown
+        assert!(matches!(cmd, Command::Status | Command::Unknown(_)));
+    }
+
+    #[test]
+    fn shell_expansion() {
+        let cmd = parse_intent("encode $(whoami)");
+        assert_eq!(cmd, Command::Encode("$(whoami)".to_string()));
+    }
+
+    #[test]
+    fn path_traversal() {
+        // "../../etc/passwd" is not a valid phext coordinate
+        let cmd = parse_intent("read ../../etc/passwd");
+        assert_eq!(cmd, Command::Read("../../etc/passwd".to_string()));
+    }
+
+    // === Edge cases: unicode ===
+
+    #[test]
+    fn encode_emoji() {
+        assert_eq!(parse_intent("encode 🦋"), Command::Encode("🦋".to_string()));
+    }
+
+    #[test]
+    fn encode_accented() {
+        assert_eq!(parse_intent("encode café"), Command::Encode("café".to_string()));
+    }
+
+    // === Edge cases: coordinate parsing ===
+
+    #[test]
+    fn coord_all_zeros() {
+        let coord = extract_coord_from_text("read 0.0.0/0.0.0/0.0.0");
+        assert_eq!(coord, Some("0.0.0/0.0.0/0.0.0".to_string()));
+    }
+
+    #[test]
+    fn coord_max_dims() {
+        let coord = extract_coord_from_text("2047.2047.2047/2047.2047.2047/2047.2047.2047");
+        assert_eq!(coord, Some("2047.2047.2047/2047.2047.2047/2047.2047.2047".to_string()));
+    }
+
+    #[test]
+    fn coord_partial_one_group() {
+        // "1.1.1" alone is not a valid 9-dim coordinate
+        assert_eq!(extract_coord_from_text("1.1.1"), None);
+    }
+
+    #[test]
+    fn coord_partial_two_groups() {
+        assert_eq!(extract_coord_from_text("1.1.1/1.1.1"), None);
+    }
+
+    #[test]
+    fn coord_missing_dots() {
+        // "1/1/1" is not valid (only 3 numbers, need 9)
+        assert_eq!(extract_coord_from_text("1/1/1"), None);
+    }
+
+    // === Edge cases: bare coordinate as input ===
+
+    #[test]
+    fn bare_coordinate_reads() {
+        // A bare coordinate should be treated as a read
+        let cmd = parse_intent("1.1.1/1.1.1/1.1.1");
+        assert_eq!(cmd, Command::Read("1.1.1/1.1.1/1.1.1".to_string()));
+    }
+
+    // === Edge cases: single words that aren't commands ===
+
+    #[test]
+    fn single_word_unknown() {
+        assert!(matches!(parse_intent("what"), Command::Unknown(_)));
+        assert!(matches!(parse_intent("the"), Command::Unknown(_)));
+    }
+
+    // === Edge cases: Base 256 decode case sensitivity ===
+
+    #[test]
+    fn decode_preserves_case() {
+        // decode should work case-insensitively (handled by base256 module)
+        let cmd = parse_intent("decode bac");
+        assert_eq!(cmd, Command::Decode("bac".to_string()));
+    }
+
+    #[test]
+    fn decode_multiple() {
+        let cmd = parse_intent("decode bac wom bac");
+        assert_eq!(cmd, Command::Decode("bac wom bac".to_string()));
+    }
+
+    // === Edge cases: negative numbers ===
+
+    #[test]
+    fn negative_sentron_id() {
+        // "-1" — the negative sign should prevent number extraction
+        let cmd = parse_intent("show sentron -1");
+        // Should parse the 1, not crash
+        assert_eq!(cmd, Command::Sentron(1));
+    }
 }

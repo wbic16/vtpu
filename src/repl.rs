@@ -414,4 +414,91 @@ mod tests {
         let output = session.execute(&Command::Unknown("blorp".to_string()));
         assert!(output.contains("Unknown command"));
     }
+
+    // === Hardening: unexpected inputs ===
+
+    #[test]
+    fn session_empty_unknown() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Unknown(String::new()));
+        assert!(output.is_empty()); // Empty unknown = no output
+    }
+
+    #[test]
+    fn session_run_zero() {
+        let mut session = ReplSession::new(3);
+        let output = session.execute(&Command::Run(0));
+        assert!(output.contains("0 cycles"));
+        assert_eq!(session.sentrons[0].cycles, 0);
+    }
+
+    #[test]
+    fn session_sentron_boundary() {
+        let mut session = ReplSession::new(9);
+        // Last valid
+        let output = session.execute(&Command::Sentron(8));
+        assert!(output.contains("Sentron #8"));
+        // First invalid
+        let output = session.execute(&Command::Sentron(9));
+        assert!(output.contains("No sentron"));
+    }
+
+    #[test]
+    fn session_read_invalid_coord() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Read("garbage".to_string()));
+        assert!(output.contains("Invalid coordinate"));
+    }
+
+    #[test]
+    fn session_write_invalid_coord() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Write("garbage".to_string(), "data".to_string()));
+        assert!(output.contains("Invalid coordinate"));
+    }
+
+    #[test]
+    fn session_write_empty_data() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Write("1.1.1/1.1.1/1.1.1".to_string(), String::new()));
+        assert!(output.contains("0 bytes"));
+    }
+
+    #[test]
+    fn session_encode_empty() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Encode(String::new()));
+        assert!(output.contains("0 bytes"));
+    }
+
+    #[test]
+    fn session_decode_invalid() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Decode("xyz".to_string()));
+        assert!(output.contains("Error"));
+    }
+
+    #[test]
+    fn session_multiple_writes_same_coord() {
+        let mut session = ReplSession::new(1);
+        session.execute(&Command::Write("1.1.1/1.1.1/1.1.1".to_string(), "first".to_string()));
+        session.execute(&Command::Write("1.1.1/1.1.1/1.1.1".to_string(), "second".to_string()));
+        let output = session.execute(&Command::Read("1.1.1/1.1.1/1.1.1".to_string()));
+        assert!(output.contains("second")); // Overwrites
+    }
+
+    #[test]
+    fn session_encode_unicode() {
+        let mut session = ReplSession::new(1);
+        let output = session.execute(&Command::Encode("🦋".to_string()));
+        assert!(output.contains("→")); // Should encode the UTF-8 bytes
+    }
+
+    #[test]
+    fn session_run_accumulates() {
+        let mut session = ReplSession::new(1);
+        session.execute(&Command::Run(5));
+        session.execute(&Command::Run(3));
+        assert_eq!(session.sentrons[0].cycles, 8); // 5 + 3
+    }
 }
