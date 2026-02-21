@@ -12,10 +12,11 @@ A software-defined accelerator with sentron-native instruction scheduling and ph
 | 0 — Single Core | W6–W12 | ✅ **GATE PASSED** (2.93 ops/cycle avg) |
 | 1 — SMT | W13–W18 | ✅ **GATE PASSED** (2.84x total) |
 | 2 — Memory Hierarchy | W19–W24 | 🔓 In progress |
-| 3 — Compiler | W29–W35 | ⬜ |
-| 4 — Launch | W36–W40 | ⬜ |
+| 3 — Interactivity | W25–W32 | ⬜ |
+| 4 — Compiler | W33–W37 | ⬜ |
+| 5 — Launch | W38–W40 | ⬜ |
 
-**349 tests. ~18K LOC. Zero deps.**
+**550 tests. ~20K+ LOC. Zero deps.**
 
 ## Benchmarks (Zen 4 8945HS, release)
 
@@ -92,7 +93,8 @@ The naive sentron lifecycle (4,575/sec) was **17,000x slower** than pooled (72M/
 ```bash
 git clone https://github.com/wbic16/vtpu
 cd vtpu
-cargo test          # 272 tests, all green
+cargo test          # 550 tests, all green
+cargo run --bin vtpu-repl   # Interactive REPL
 cargo run --release --bin bench       # Phase 0 gate
 cargo run --release --bin bench_w14   # Full stack benchmarks
 ```

@@ -127,3 +127,5 @@ pub mod redux;
 pub mod sysfs;
 pub mod cluster;
 pub mod base256;
+pub mod narrator;
+pub mod repl;
