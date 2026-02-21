@@ -25,7 +25,7 @@ fn main() {
             }
         }
 
-        let cmd = vtpu_runtime::repl::parse(&line);
+        let cmd = vtpu_runtime::intent::parse_intent(&line);
 
         if cmd == vtpu_runtime::repl::Command::Quit {
             println!("Goodbye.");
