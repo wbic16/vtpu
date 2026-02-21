@@ -130,3 +130,4 @@ pub mod base256;
 pub mod narrator;
 pub mod repl;
 pub mod intent;
+pub mod trick;
