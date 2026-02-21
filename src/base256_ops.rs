@@ -267,6 +267,8 @@ impl Coord256 {
 
         if v > 1 {
             factors.push((v as u8, "prime"));
+        } else if factors.is_empty() {
+            factors.push((value, "unity"));
         }
 
         factors
@@ -625,5 +627,189 @@ mod tests {
         assert_eq!(Coord256::dim_name(0), "scroll");
         assert_eq!(Coord256::dim_name(8), "library");
         assert_eq!(Coord256::dim_name(4), "volume");
+    }
+
+    // === Edge Cases ===
+
+    #[test]
+    fn test_parse_overflow_256() {
+        // 256 doesn't fit in u8
+        assert!(Coord256::parse("256.0.0/0.0.0/0.0.0").is_none());
+    }
+
+    #[test]
+    fn test_parse_negative() {
+        assert!(Coord256::parse("-1.0.0/0.0.0/0.0.0").is_none());
+    }
+
+    #[test]
+    fn test_parse_whitespace() {
+        // Should handle trimmed whitespace
+        let coord = Coord256::parse(" 1.1.1 / 1.1.1 / 1.1.1 ").unwrap();
+        assert_eq!(coord, Coord256::origin());
+    }
+
+    #[test]
+    fn test_parse_empty_string() {
+        assert!(Coord256::parse("").is_none());
+    }
+
+    #[test]
+    fn test_parse_too_few_triads() {
+        assert!(Coord256::parse("1.1.1/1.1.1").is_none());
+    }
+
+    #[test]
+    fn test_parse_too_many_triads() {
+        assert!(Coord256::parse("1.1.1/1.1.1/1.1.1/1.1.1").is_none());
+    }
+
+    #[test]
+    fn test_parse_non_numeric() {
+        assert!(Coord256::parse("a.b.c/d.e.f/g.h.i").is_none());
+    }
+
+    #[test]
+    fn test_navigate_large_positive_delta() {
+        // Jump +255 scrolls from origin
+        let origin = Coord256::origin();
+        let result = origin.navigate(&CoordDelta::scroll(255)).unwrap();
+        // 1 + 255 = 256 → carry: scroll=0, section=1+1=2
+        assert_eq!(result.dim(0), 0);
+        assert_eq!(result.dim(1), 2); // section carried
+    }
+
+    #[test]
+    fn test_navigate_all_dimensions() {
+        let origin = Coord256::origin();
+        let delta = CoordDelta::new([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+        let result = origin.navigate(&delta).unwrap();
+        assert_eq!(result.dim(0), 2);  // scroll: 1+1
+        assert_eq!(result.dim(1), 3);  // section: 1+2
+        assert_eq!(result.dim(2), 4);  // chapter: 1+3
+        assert_eq!(result.dim(8), 10); // library: 1+9
+    }
+
+    #[test]
+    fn test_navigate_zero_delta() {
+        let verse = Coord256::parse("3.1.4/1.5.9/2.6.5").unwrap();
+        let delta = CoordDelta::new([0; 9]);
+        let result = verse.navigate(&delta).unwrap();
+        assert_eq!(result, verse);
+    }
+
+    #[test]
+    fn test_max_coord_all_255() {
+        let max = Coord256 { dims: [255; 9] };
+        assert_eq!(max.to_triple_string(), "255.255.255/255.255.255/255.255.255");
+        assert!(max.to_linear().is_none()); // overflows
+    }
+
+    #[test]
+    fn test_max_no_library_linear() {
+        let max_no_lib = Coord256 { dims: [255, 255, 255, 255, 255, 255, 255, 255, 0] };
+        let linear = max_no_lib.to_linear().unwrap();
+        assert_eq!(linear, u64::MAX); // 0x00FFFFFFFFFFFFFF
+    }
+
+    #[test]
+    fn test_linear_from_linear_zero() {
+        let coord = Coord256::from_linear(0);
+        assert_eq!(coord, Coord256::zero());
+    }
+
+    #[test]
+    fn test_linear_from_linear_max() {
+        let coord = Coord256::from_linear(u64::MAX);
+        // u64::MAX = 0xFFFFFFFFFFFFFFFF = all 8 lower dims = 255, library = 0
+        for i in 0..8 {
+            assert_eq!(coord.dim(i), 255);
+        }
+        assert_eq!(coord.dim(8), 0); // library stays 0
+    }
+
+    #[test]
+    fn test_weighted_distance_same() {
+        let coord = Coord256::origin();
+        assert_eq!(coord.weighted_distance(&coord), 0);
+    }
+
+    #[test]
+    fn test_weighted_distance_library_heavy() {
+        // Difference in shelf dimension weighs much more than scroll
+        let a = Coord256::parse("0.1.0/0.0.0/0.0.0").unwrap();
+        let b = Coord256::parse("0.2.0/0.0.0/0.0.0").unwrap();
+        let c = Coord256::parse("0.0.0/0.0.0/0.0.1").unwrap();
+        let d = Coord256::parse("0.0.0/0.0.0/0.0.2").unwrap();
+        let shelf_dist = a.weighted_distance(&b);  // 1 × 256^7
+        let scroll_dist = c.weighted_distance(&d);  // 1 × 256^0
+        assert!(shelf_dist > scroll_dist);
+        assert_eq!(scroll_dist, 1);
+    }
+
+    #[test]
+    fn test_coord_equality() {
+        let a = Coord256::parse("3.1.4/1.5.9/2.6.5").unwrap();
+        let b = Coord256::from_triples([3, 1, 4], [1, 5, 9], [2, 6, 5]);
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_coord_inequality() {
+        let a = Coord256::parse("3.1.4/1.5.9/2.6.5").unwrap();
+        let b = Coord256::parse("3.1.4/1.5.9/2.6.6").unwrap();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_constitutional_factors_1() {
+        let factors = Coord256::constitutional_factors(1);
+        // 1 = unity (indivisible, not prime, not void)
+        assert_eq!(factors.len(), 1);
+        assert_eq!(factors[0].0, 1);
+        assert_eq!(factors[0].1, "unity");
+    }
+
+    #[test]
+    fn test_constitutional_factors_42() {
+        // 42 = 2 × 3 × 7 (answer to everything)
+        let factors = Coord256::constitutional_factors(42);
+        let values: Vec<u8> = factors.iter().map(|&(v, _)| v).collect();
+        assert!(values.contains(&7));  // completion
+        assert!(values.contains(&3));  // triadic
+        assert!(values.contains(&2));  // duality
+    }
+
+    #[test]
+    fn test_navigate_section_forward() {
+        let coord = Coord256::origin();
+        let result = coord.navigate(&CoordDelta::section(1)).unwrap();
+        assert_eq!(result.dim(0), 1);  // scroll unchanged
+        assert_eq!(result.dim(1), 2);  // section: 1+1 = 2
+    }
+
+    #[test]
+    fn test_navigate_chapter_forward() {
+        let coord = Coord256::origin();
+        let result = coord.navigate(&CoordDelta::chapter(5)).unwrap();
+        assert_eq!(result.dim(2), 6);  // chapter: 1+5 = 6
+    }
+
+    #[test]
+    fn test_coord_clone() {
+        let a = Coord256::parse("3.1.4/1.5.9/2.6.5").unwrap();
+        let b = a;
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn test_coord_hash() {
+        use std::collections::HashSet;
+        let mut set = HashSet::new();
+        let a = Coord256::parse("3.1.4/1.5.9/2.6.5").unwrap();
+        set.insert(a);
+        assert!(set.contains(&a));
+        let b = Coord256::parse("1.1.1/1.1.1/1.1.1").unwrap();
+        assert!(!set.contains(&b));
     }
 }
