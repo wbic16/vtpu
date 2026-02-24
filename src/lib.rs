@@ -133,3 +133,4 @@ pub mod intent;
 pub mod trick;
 pub mod coop_smt;
 pub mod eggs;
+pub mod easter_island;
