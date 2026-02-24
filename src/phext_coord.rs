@@ -37,19 +37,24 @@ impl PhextCoord {
         assert!(dims.iter().all(|&d| d <= Self::MAX_DIM), 
                 "Dimension values must fit in 11 bits (0-2047)");
         
-        // Pack dimensions into 128 bits
+        // Pack 11 × 11-bit dimensions into 128 bits (121 bits used)
+        // Layout: dims[0..5] in lo (bits 0-54, 55 bits used)
+        //         dims[5] split: low 9 bits in lo[55..63], high 2 bits in hi[0..1]
+        //         dims[6..10] in hi (bits 2-56, 55 bits used)
+        // Total: 64 + 57 = 121 bits, fits in 128
         let lo = (dims[0] as u64) 
                | ((dims[1] as u64) << 11)
                | ((dims[2] as u64) << 22)
                | ((dims[3] as u64) << 33)
                | ((dims[4] as u64) << 44)
-               | ((dims[5] as u64) << 55);
+               | (((dims[5] as u64) & 0x1FF) << 55); // low 9 bits of dim[5]
         
-        let hi = (dims[6] as u64)
-               | ((dims[7] as u64) << 11)
-               | ((dims[8] as u64) << 22)
-               | ((dims[9] as u64) << 33)
-               | ((dims[10] as u64) << 44);
+        let hi = ((dims[5] as u64) >> 9)              // high 2 bits of dim[5]
+               | ((dims[6] as u64) << 2)
+               | ((dims[7] as u64) << 13)
+               | ((dims[8] as u64) << 24)
+               | ((dims[9] as u64) << 35)
+               | ((dims[10] as u64) << 46);
         
         Self { lo, hi }
     }
@@ -70,13 +75,14 @@ impl PhextCoord {
                | ((dims[2] as u64) << 22)
                | ((dims[3] as u64) << 33)
                | ((dims[4] as u64) << 44)
-               | ((dims[5] as u64) << 55);
+               | (((dims[5] as u64) & 0x1FF) << 55);
         
-        let hi = (dims[6] as u64)
-               | ((dims[7] as u64) << 11)
-               | ((dims[8] as u64) << 22)
-               | ((dims[9] as u64) << 33)
-               | ((dims[10] as u64) << 44);
+        let hi = ((dims[5] as u64) >> 9)
+               | ((dims[6] as u64) << 2)
+               | ((dims[7] as u64) << 13)
+               | ((dims[8] as u64) << 24)
+               | ((dims[9] as u64) << 35)
+               | ((dims[10] as u64) << 46);
         
         Self { lo, hi }
     }
@@ -85,10 +91,17 @@ impl PhextCoord {
     pub fn get_dim(&self, dim: u8) -> u16 {
         assert!(dim < 11, "Dimension index must be 0-10");
         
-        if dim < 6 {
+        if dim < 5 {
             ((self.lo >> (dim * 11)) & 0x7FF) as u16
+        } else if dim == 5 {
+            // dim[5] is split: low 9 bits in lo[55..63], high 2 bits in hi[0..1]
+            let low_part = (self.lo >> 55) & 0x1FF;
+            let high_part = self.hi & 0x3;
+            (low_part | (high_part << 9)) as u16
         } else {
-            ((self.hi >> ((dim - 6) * 11)) & 0x7FF) as u16
+            // dims 6-10 in hi, offset by 2 bits (dim[5] overflow)
+            let shift = (dim - 6) * 11 + 2;
+            ((self.hi >> shift) & 0x7FF) as u16
         }
     }
     
@@ -97,12 +110,18 @@ impl PhextCoord {
         assert!(dim < 11, "Dimension index must be 0-10");
         assert!(value <= Self::MAX_DIM, "Dimension value must fit in 11 bits");
         
-        if dim < 6 {
+        if dim < 5 {
             let shift = dim * 11;
             let mask = !(0x7FFu64 << shift);
             self.lo = (self.lo & mask) | ((value as u64) << shift);
+        } else if dim == 5 {
+            // Split: low 9 bits in lo[55..63], high 2 bits in hi[0..1]
+            let lo_mask = !(0x1FFu64 << 55);
+            self.lo = (self.lo & lo_mask) | (((value as u64) & 0x1FF) << 55);
+            let hi_mask = !0x3u64;
+            self.hi = (self.hi & hi_mask) | ((value as u64) >> 9);
         } else {
-            let shift = (dim - 6) * 11;
+            let shift = (dim - 6) * 11 + 2;
             let mask = !(0x7FFu64 << shift);
             self.hi = (self.hi & mask) | ((value as u64) << shift);
         }
@@ -154,6 +173,17 @@ impl PhextCoord {
     }
     
     /// Hamming distance to another coordinate (count of differing dimensions)
+    /// Midpoint between two coordinates (average of each dimension)
+    pub fn midpoint(a: &Self, b: &Self) -> Self {
+        let da = a.dims();
+        let db = b.dims();
+        let mut mid = [0u16; 11];
+        for i in 0..11 {
+            mid[i] = ((da[i] as u32 + db[i] as u32) / 2) as u16;
+        }
+        Self::new(mid)
+    }
+
     pub fn hamming_distance(&self, other: &Self) -> u32 {
         let dims_a = self.dims();
         let dims_b = other.dims();

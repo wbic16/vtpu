@@ -76,6 +76,7 @@ pub mod analysis;
 pub mod curves;
 pub mod c_pipe;
 pub mod cost;
+pub mod spanning;
 pub mod synchronicity;
 pub mod iching;
 pub mod harmonic;
