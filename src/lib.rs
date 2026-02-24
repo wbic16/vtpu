@@ -131,3 +131,4 @@ pub mod narrator;
 pub mod repl;
 pub mod intent;
 pub mod trick;
+pub mod coop_smt;

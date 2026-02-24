@@ -316,7 +316,12 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
             active += 1;
         }
         CoordOp::CROUTE { .. } => { active += 1; }
-        CoordOp::CSEND { .. } => { active += 1; }
+        CoordOp::CSEND { msg_reg, dest_sentron } => {
+            // Push to outbox — fleet drains this during flush
+            let value = sentron.regs.general[(msg_reg as usize) % 16];
+            sentron.outbox.push((dest_sentron as u16, value));
+            active += 1;
+        }
         CoordOp::CRECV { rd, .. } => {
             // Pop from inbox if available, otherwise 0
             sentron.regs.general[rd as usize] = match sentron.inbox.pop() {
@@ -326,7 +331,11 @@ fn exec_siw(sentron: &mut Sentron, siw: &SIW, mem: &mut Memory) -> u8 {
             active += 1;
         }
         CoordOp::CBAR { .. } => { active += 1; }
-        CoordOp::CFENCE { .. } => { active += 1; }
+        CoordOp::CFENCE { .. } => {
+            // Increment fence generation — fleet respects ordering across this boundary
+            sentron.fence_gen += 1;
+            active += 1;
+        }
         CoordOp::CREDUCE { rd, rs, op, .. } => {
             let val = sentron.regs.general[rs as usize];
             sentron.regs.general[rd as usize] = match op {
@@ -658,15 +667,23 @@ fn exec_c_send(sentron: &mut Sentron, siw: &SIW) -> u8 {
                 None => 0,
             };
         }
-        CoordOp::CSEND { .. } | CoordOp::CROUTE { .. } | CoordOp::CFANOUT { .. } => {}
+        CoordOp::CSEND { msg_reg, dest_sentron } => {
+            let value = sentron.regs.general[(msg_reg as usize) % 16];
+            sentron.outbox.push((dest_sentron as u16, value));
+        }
+        CoordOp::CROUTE { .. } | CoordOp::CFANOUT { .. } => {}
         _ => {}
     }
     1
 }
 
 #[inline(always)]
-fn exec_c_barrier(_sentron: &mut Sentron, _siw: &SIW) -> u8 {
-    // CBAR and CFENCE are coordination points — no register mutation
+fn exec_c_barrier(sentron: &mut Sentron, siw: &SIW) -> u8 {
+    // CBAR: coordination point (fleet handles synchronization)
+    // CFENCE: memory ordering barrier — increment fence generation
+    if let CoordOp::CFENCE { .. } = siw.c_op {
+        sentron.fence_gen += 1;
+    }
     1
 }
 

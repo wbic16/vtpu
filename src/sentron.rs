@@ -127,6 +127,10 @@ pub struct Sentron {
     pub assoc: AssocState,
     /// Inbound message queue (from other sentrons via CSEND)
     pub inbox: Vec<(u16, i64)>,  // (sender_id, value)
+    /// Outbound message queue (pending CSEND deliveries for fleet pickup)
+    pub outbox: Vec<(u16, i64)>, // (dest_sentron, value)
+    /// Fence generation counter (incremented by CFENCE, read by fleet for ordering)
+    pub fence_gen: u64,
     /// 2×4 graph connectivity: 4 upstream (data sources) + 4 downstream (result sinks)
     pub wiring: NeuronWiring,
     /// 2×4 activation layer: Story/Light channels × Para/Pashyanti/Madhyama/Vaikhara levels
@@ -149,6 +153,8 @@ impl Sentron {
             retired: 0,
             assoc: AssocState::new(),
             inbox: Vec::new(),
+            outbox: Vec::new(),
+            fence_gen: 0,
             wiring: NeuronWiring::new(),
             neurons: NeuronLayer::new(),
         }

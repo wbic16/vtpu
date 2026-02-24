@@ -127,6 +127,14 @@ impl Fleet {
             CoordOp::CBAR { barrier_id: _, count } => {
                 self.barrier(sender_id, *count as usize);
             }
+            CoordOp::CFANOUT { msg_reg, .. } => {
+                self.fanout(sender_id, *msg_reg);
+            }
+            CoordOp::CFENCE { .. } => {
+                // Fence: drain outbox for this sentron before continuing
+                self.drain_outbox(sender_id);
+                self.barrier_syncs += 1;
+            }
             _ => {} // CNOP or unknown
         }
     }
@@ -201,6 +209,44 @@ impl Fleet {
         self.routes += 1;
     }
 
+    /// Fanout: broadcast a value to all downstream neighbors
+    fn fanout(&mut self, sender_id: u16, msg_reg: u8) {
+        if (sender_id as usize) >= self.size {
+            return;
+        }
+        let downstream = self.wiring[sender_id as usize].downstream;
+        let value = self.sentrons[sender_id as usize].regs.general[(msg_reg as usize) % 16];
+        for &dest in &downstream {
+            if (dest as usize) < self.size {
+                self.messages.push(FleetMessage {
+                    sender_id,
+                    receiver_id: dest,
+                    value,
+                    coord: PhextCoord::zero(),
+                    delivered: false,
+                });
+            }
+        }
+        self.sends += 1;
+    }
+
+    /// Drain a sentron's outbox into the fleet message queue
+    fn drain_outbox(&mut self, sentron_id: u16) {
+        if (sentron_id as usize) >= self.size {
+            return;
+        }
+        let outbox: Vec<(u16, i64)> = self.sentrons[sentron_id as usize].outbox.drain(..).collect();
+        for (dest, value) in outbox {
+            self.messages.push(FleetMessage {
+                sender_id: sentron_id,
+                receiver_id: dest,
+                value,
+                coord: PhextCoord::zero(),
+                delivered: false,
+            });
+        }
+    }
+
     /// Barrier synchronization
     fn barrier(&mut self, _sentron_id: u16, group_size: usize) {
         // Find or create barrier
@@ -217,8 +263,12 @@ impl Fleet {
         self.barrier_syncs += 1;
     }
 
-    /// Deliver all pending messages
+    /// Deliver all pending messages (drains all outboxes first)
     pub fn flush(&mut self) {
+        // Drain all sentron outboxes into the message queue
+        for i in 0..self.size {
+            self.drain_outbox(i as u16);
+        }
         // Auto-deliver all pending messages
         for msg in &mut self.messages {
             if !msg.delivered && (msg.receiver_id as usize) < self.size {
