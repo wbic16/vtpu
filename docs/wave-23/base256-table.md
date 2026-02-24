@@ -1,260 +1,630 @@
-# Base 256 — Complete Encoding Table
+# Base256 Full Lookup Table
+**Wave:** R23W23  
+**Generated:** 2026-02-19
 
-| Byte | Hex  | Syllable | Onset | Vowel | Coda |
-|------|------|----------|-------|-------|------|
-|   0  | 0x00 | bac      | b     | a     | c    |
-|   1  | 0x01 | bad      | b     | a     | d    |
-|   2  | 0x02 | baf      | b     | a     | f    |
-|   3  | 0x03 | bam      | b     | a     | m    |
-|   4  | 0x04 | bec      | b     | e     | c    |
-|   5  | 0x05 | bed      | b     | e     | d    |
-|   6  | 0x06 | bef      | b     | e     | f    |
-|   7  | 0x07 | bem      | b     | e     | m    |
-|   8  | 0x08 | bic      | b     | i     | c    |
-|   9  | 0x09 | bid      | b     | i     | d    |
-|  10  | 0x0A | bif      | b     | i     | f    |
-|  11  | 0x0B | bim      | b     | i     | m    |
-|  12  | 0x0C | boc      | b     | o     | c    |
-|  13  | 0x0D | bod      | b     | o     | d    |
-|  14  | 0x0E | bof      | b     | o     | f    |
-|  15  | 0x0F | bom      | b     | o     | m    |
-|  16  | 0x10 | dac      | d     | a     | c    |
-|  17  | 0x11 | dad      | d     | a     | d    |
-|  18  | 0x12 | daf      | d     | a     | f    |
-|  19  | 0x13 | dam      | d     | a     | m    |
-|  20  | 0x14 | dec      | d     | e     | c    |
-|  21  | 0x15 | ded      | d     | e     | d    |
-|  22  | 0x16 | def      | d     | e     | f    |
-|  23  | 0x17 | dem      | d     | e     | m    |
-|  24  | 0x18 | dic      | d     | i     | c    |
-|  25  | 0x19 | did      | d     | i     | d    |
-|  26  | 0x1A | dif      | d     | i     | f    |
-|  27  | 0x1B | dim      | d     | i     | m    |
-|  28  | 0x1C | doc      | d     | o     | c    |
-|  29  | 0x1D | dod      | d     | o     | d    |
-|  30  | 0x1E | dof      | d     | o     | f    |
-|  31  | 0x1F | dom      | d     | o     | m    |
-|  32  | 0x20 | fac      | f     | a     | c    |
-|  33  | 0x21 | fad      | f     | a     | d    |
-|  34  | 0x22 | faf      | f     | a     | f    |
-|  35  | 0x23 | fam      | f     | a     | m    |
-|  36  | 0x24 | fec      | f     | e     | c    |
-|  37  | 0x25 | fed      | f     | e     | d    |
-|  38  | 0x26 | fef      | f     | e     | f    |
-|  39  | 0x27 | fem      | f     | e     | m    |
-|  40  | 0x28 | fic      | f     | i     | c    |
-|  41  | 0x29 | fid      | f     | i     | d    |
-|  42  | 0x2A | fif      | f     | i     | f    |
-|  43  | 0x2B | fim      | f     | i     | m    |
-|  44  | 0x2C | foc      | f     | o     | c    |
-|  45  | 0x2D | fod      | f     | o     | d    |
-|  46  | 0x2E | fof      | f     | o     | f    |
-|  47  | 0x2F | fom      | f     | o     | m    |
-|  48  | 0x30 | gac      | g     | a     | c    |
-|  49  | 0x31 | gad      | g     | a     | d    |
-|  50  | 0x32 | gaf      | g     | a     | f    |
-|  51  | 0x33 | gam      | g     | a     | m    |
-|  52  | 0x34 | gec      | g     | e     | c    |
-|  53  | 0x35 | ged      | g     | e     | d    |
-|  54  | 0x36 | gef      | g     | e     | f    |
-|  55  | 0x37 | gem      | g     | e     | m    |
-|  56  | 0x38 | gic      | g     | i     | c    |
-|  57  | 0x39 | gid      | g     | i     | d    |
-|  58  | 0x3A | gif      | g     | i     | f    |
-|  59  | 0x3B | gim      | g     | i     | m    |
-|  60  | 0x3C | goc      | g     | o     | c    |
-|  61  | 0x3D | god      | g     | o     | d    |
-|  62  | 0x3E | gof      | g     | o     | f    |
-|  63  | 0x3F | gom      | g     | o     | m    |
-|  64  | 0x40 | hac      | h     | a     | c    |
-|  65  | 0x41 | had      | h     | a     | d    |
-|  66  | 0x42 | haf      | h     | a     | f    |
-|  67  | 0x43 | ham      | h     | a     | m    |
-|  68  | 0x44 | hec      | h     | e     | c    |
-|  69  | 0x45 | hed      | h     | e     | d    |
-|  70  | 0x46 | hef      | h     | e     | f    |
-|  71  | 0x47 | hem      | h     | e     | m    |
-|  72  | 0x48 | hic      | h     | i     | c    |
-|  73  | 0x49 | hid      | h     | i     | d    |
-|  74  | 0x4A | hif      | h     | i     | f    |
-|  75  | 0x4B | him      | h     | i     | m    |
-|  76  | 0x4C | hoc      | h     | o     | c    |
-|  77  | 0x4D | hod      | h     | o     | d    |
-|  78  | 0x4E | hof      | h     | o     | f    |
-|  79  | 0x4F | hom      | h     | o     | m    |
-|  80  | 0x50 | jac      | j     | a     | c    |
-|  81  | 0x51 | jad      | j     | a     | d    |
-|  82  | 0x52 | jaf      | j     | a     | f    |
-|  83  | 0x53 | jam      | j     | a     | m    |
-|  84  | 0x54 | jec      | j     | e     | c    |
-|  85  | 0x55 | jed      | j     | e     | d    |
-|  86  | 0x56 | jef      | j     | e     | f    |
-|  87  | 0x57 | jem      | j     | e     | m    |
-|  88  | 0x58 | jic      | j     | i     | c    |
-|  89  | 0x59 | jid      | j     | i     | d    |
-|  90  | 0x5A | jif      | j     | i     | f    |
-|  91  | 0x5B | jim      | j     | i     | m    |
-|  92  | 0x5C | joc      | j     | o     | c    |
-|  93  | 0x5D | jod      | j     | o     | d    |
-|  94  | 0x5E | jof      | j     | o     | f    |
-|  95  | 0x5F | jom      | j     | o     | m    |
-|  96  | 0x60 | kac      | k     | a     | c    |
-|  97  | 0x61 | kad      | k     | a     | d    |
-|  98  | 0x62 | kaf      | k     | a     | f    |
-|  99  | 0x63 | kam      | k     | a     | m    |
-| 100  | 0x64 | kec      | k     | e     | c    |
-| 101  | 0x65 | ked      | k     | e     | d    |
-| 102  | 0x66 | kef      | k     | e     | f    |
-| 103  | 0x67 | kem      | k     | e     | m    |
-| 104  | 0x68 | kic      | k     | i     | c    |
-| 105  | 0x69 | kid      | k     | i     | d    |
-| 106  | 0x6A | kif      | k     | i     | f    |
-| 107  | 0x6B | kim      | k     | i     | m    |
-| 108  | 0x6C | koc      | k     | o     | c    |
-| 109  | 0x6D | kod      | k     | o     | d    |
-| 110  | 0x6E | kof      | k     | o     | f    |
-| 111  | 0x6F | kom      | k     | o     | m    |
-| 112  | 0x70 | lac      | l     | a     | c    |
-| 113  | 0x71 | lad      | l     | a     | d    |
-| 114  | 0x72 | laf      | l     | a     | f    |
-| 115  | 0x73 | lam      | l     | a     | m    |
-| 116  | 0x74 | lec      | l     | e     | c    |
-| 117  | 0x75 | led      | l     | e     | d    |
-| 118  | 0x76 | lef      | l     | e     | f    |
-| 119  | 0x77 | lem      | l     | e     | m    |
-| 120  | 0x78 | lic      | l     | i     | c    |
-| 121  | 0x79 | lid      | l     | i     | d    |
-| 122  | 0x7A | lif      | l     | i     | f    |
-| 123  | 0x7B | lim      | l     | i     | m    |
-| 124  | 0x7C | loc      | l     | o     | c    |
-| 125  | 0x7D | lod      | l     | o     | d    |
-| 126  | 0x7E | lof      | l     | o     | f    |
-| 127  | 0x7F | lom      | l     | o     | m    |
-| 128  | 0x80 | mac      | m     | a     | c    |
-| 129  | 0x81 | mad      | m     | a     | d    |
-| 130  | 0x82 | maf      | m     | a     | f    |
-| 131  | 0x83 | mam      | m     | a     | m    |
-| 132  | 0x84 | mec      | m     | e     | c    |
-| 133  | 0x85 | med      | m     | e     | d    |
-| 134  | 0x86 | mef      | m     | e     | f    |
-| 135  | 0x87 | mem      | m     | e     | m    |
-| 136  | 0x88 | mic      | m     | i     | c    |
-| 137  | 0x89 | mid      | m     | i     | d    |
-| 138  | 0x8A | mif      | m     | i     | f    |
-| 139  | 0x8B | mim      | m     | i     | m    |
-| 140  | 0x8C | moc      | m     | o     | c    |
-| 141  | 0x8D | mod      | m     | o     | d    |
-| 142  | 0x8E | mof      | m     | o     | f    |
-| 143  | 0x8F | mom      | m     | o     | m    |
-| 144  | 0x90 | nac      | n     | a     | c    |
-| 145  | 0x91 | nad      | n     | a     | d    |
-| 146  | 0x92 | naf      | n     | a     | f    |
-| 147  | 0x93 | nam      | n     | a     | m    |
-| 148  | 0x94 | nec      | n     | e     | c    |
-| 149  | 0x95 | ned      | n     | e     | d    |
-| 150  | 0x96 | nef      | n     | e     | f    |
-| 151  | 0x97 | nem      | n     | e     | m    |
-| 152  | 0x98 | nic      | n     | i     | c    |
-| 153  | 0x99 | nid      | n     | i     | d    |
-| 154  | 0x9A | nif      | n     | i     | f    |
-| 155  | 0x9B | nim      | n     | i     | m    |
-| 156  | 0x9C | noc      | n     | o     | c    |
-| 157  | 0x9D | nod      | n     | o     | d    |
-| 158  | 0x9E | nof      | n     | o     | f    |
-| 159  | 0x9F | nom      | n     | o     | m    |
-| 160  | 0xA0 | pac      | p     | a     | c    |
-| 161  | 0xA1 | pad      | p     | a     | d    |
-| 162  | 0xA2 | paf      | p     | a     | f    |
-| 163  | 0xA3 | pam      | p     | a     | m    |
-| 164  | 0xA4 | pec      | p     | e     | c    |
-| 165  | 0xA5 | ped      | p     | e     | d    |
-| 166  | 0xA6 | pef      | p     | e     | f    |
-| 167  | 0xA7 | pem      | p     | e     | m    |
-| 168  | 0xA8 | pic      | p     | i     | c    |
-| 169  | 0xA9 | pid      | p     | i     | d    |
-| 170  | 0xAA | pif      | p     | i     | f    |
-| 171  | 0xAB | pim      | p     | i     | m    |
-| 172  | 0xAC | poc      | p     | o     | c    |
-| 173  | 0xAD | pod      | p     | o     | d    |
-| 174  | 0xAE | pof      | p     | o     | f    |
-| 175  | 0xAF | pom      | p     | o     | m    |
-| 176  | 0xB0 | rac      | r     | a     | c    |
-| 177  | 0xB1 | rad      | r     | a     | d    |
-| 178  | 0xB2 | raf      | r     | a     | f    |
-| 179  | 0xB3 | ram      | r     | a     | m    |
-| 180  | 0xB4 | rec      | r     | e     | c    |
-| 181  | 0xB5 | red      | r     | e     | d    |
-| 182  | 0xB6 | ref      | r     | e     | f    |
-| 183  | 0xB7 | rem      | r     | e     | m    |
-| 184  | 0xB8 | ric      | r     | i     | c    |
-| 185  | 0xB9 | rid      | r     | i     | d    |
-| 186  | 0xBA | rif      | r     | i     | f    |
-| 187  | 0xBB | rim      | r     | i     | m    |
-| 188  | 0xBC | roc      | r     | o     | c    |
-| 189  | 0xBD | rod      | r     | o     | d    |
-| 190  | 0xBE | rof      | r     | o     | f    |
-| 191  | 0xBF | rom      | r     | o     | m    |
-| 192  | 0xC0 | sac      | s     | a     | c    |
-| 193  | 0xC1 | sad      | s     | a     | d    |
-| 194  | 0xC2 | saf      | s     | a     | f    |
-| 195  | 0xC3 | sam      | s     | a     | m    |
-| 196  | 0xC4 | sec      | s     | e     | c    |
-| 197  | 0xC5 | sed      | s     | e     | d    |
-| 198  | 0xC6 | sef      | s     | e     | f    |
-| 199  | 0xC7 | sem      | s     | e     | m    |
-| 200  | 0xC8 | sic      | s     | i     | c    |
-| 201  | 0xC9 | sid      | s     | i     | d    |
-| 202  | 0xCA | sif      | s     | i     | f    |
-| 203  | 0xCB | sim      | s     | i     | m    |
-| 204  | 0xCC | soc      | s     | o     | c    |
-| 205  | 0xCD | sod      | s     | o     | d    |
-| 206  | 0xCE | sof      | s     | o     | f    |
-| 207  | 0xCF | som      | s     | o     | m    |
-| 208  | 0xD0 | tac      | t     | a     | c    |
-| 209  | 0xD1 | tad      | t     | a     | d    |
-| 210  | 0xD2 | taf      | t     | a     | f    |
-| 211  | 0xD3 | tam      | t     | a     | m    |
-| 212  | 0xD4 | tec      | t     | e     | c    |
-| 213  | 0xD5 | ted      | t     | e     | d    |
-| 214  | 0xD6 | tef      | t     | e     | f    |
-| 215  | 0xD7 | tem      | t     | e     | m    |
-| 216  | 0xD8 | tic      | t     | i     | c    |
-| 217  | 0xD9 | tid      | t     | i     | d    |
-| 218  | 0xDA | tif      | t     | i     | f    |
-| 219  | 0xDB | tim      | t     | i     | m    |
-| 220  | 0xDC | toc      | t     | o     | c    |
-| 221  | 0xDD | tod      | t     | o     | d    |
-| 222  | 0xDE | tof      | t     | o     | f    |
-| 223  | 0xDF | tom      | t     | o     | m    |
-| 224  | 0xE0 | vac      | v     | a     | c    |
-| 225  | 0xE1 | vad      | v     | a     | d    |
-| 226  | 0xE2 | vaf      | v     | a     | f    |
-| 227  | 0xE3 | vam      | v     | a     | m    |
-| 228  | 0xE4 | vec      | v     | e     | c    |
-| 229  | 0xE5 | ved      | v     | e     | d    |
-| 230  | 0xE6 | vef      | v     | e     | f    |
-| 231  | 0xE7 | vem      | v     | e     | m    |
-| 232  | 0xE8 | vic      | v     | i     | c    |
-| 233  | 0xE9 | vid      | v     | i     | d    |
-| 234  | 0xEA | vif      | v     | i     | f    |
-| 235  | 0xEB | vim      | v     | i     | m    |
-| 236  | 0xEC | voc      | v     | o     | c    |
-| 237  | 0xED | vod      | v     | o     | d    |
-| 238  | 0xEE | vof      | v     | o     | f    |
-| 239  | 0xEF | vom      | v     | o     | m    |
-| 240  | 0xF0 | wac      | w     | a     | c    |
-| 241  | 0xF1 | wad      | w     | a     | d    |
-| 242  | 0xF2 | waf      | w     | a     | f    |
-| 243  | 0xF3 | wam      | w     | a     | m    |
-| 244  | 0xF4 | wec      | w     | e     | c    |
-| 245  | 0xF5 | wed      | w     | e     | d    |
-| 246  | 0xF6 | wef      | w     | e     | f    |
-| 247  | 0xF7 | wem      | w     | e     | m    |
-| 248  | 0xF8 | wic      | w     | i     | c    |
-| 249  | 0xF9 | wid      | w     | i     | d    |
-| 250  | 0xFA | wif      | w     | i     | f    |
-| 251  | 0xFB | wim      | w     | i     | m    |
-| 252  | 0xFC | woc      | w     | o     | c    |
-| 253  | 0xFD | wod      | w     | o     | d    |
-| 254  | 0xFE | wof      | w     | o     | f    |
-| 255  | 0xFF | wom      | w     | o     | m    |
+All 256 byte values (0x00–0xFF) mapped to phonetic syllables.
+
+## Table Format
+```
+Byte (hex) | Byte (dec) | Binary        | Syllable | Pronunciation (IPA)
+```
+
+## Full Table
+
+| Hex  | Dec | Binary     | Syllable | IPA        |
+|------|-----|------------|----------|------------|
+| 00   |   0 | 00000000 | bac      | /bæk/      |
+| 01   |   1 | 00000001 | bad      | /bæd/      |
+| 02   |   2 | 00000010 | baf      | /bæf/      |
+| 03   |   3 | 00000011 | bam      | /bæm/      |
+| 04   |   4 | 00000100 | bec      | /bɛk/      |
+| 05   |   5 | 00000101 | bed      | /bɛd/      |
+| 06   |   6 | 00000110 | bef      | /bɛf/      |
+| 07   |   7 | 00000111 | bem      | /bɛm/      |
+| 08   |   8 | 00001000 | bic      | /bɪk/      |
+| 09   |   9 | 00001001 | bid      | /bɪd/      |
+| 0A   |  10 | 00001010 | bif      | /bɪf/      |
+| 0B   |  11 | 00001011 | bim      | /bɪm/      |
+| 0C   |  12 | 00001100 | boc      | /boʊk/     |
+| 0D   |  13 | 00001101 | bod      | /boʊd/     |
+| 0E   |  14 | 00001110 | bof      | /boʊf/     |
+| 0F   |  15 | 00001111 | bom      | /boʊm/     |
+| 10   |  16 | 00010000 | dac      | /dæk/      |
+| 11   |  17 | 00010001 | dad      | /dæd/      |
+| 12   |  18 | 00010010 | daf      | /dæf/      |
+| 13   |  19 | 00010011 | dam      | /dæm/      |
+| 14   |  20 | 00010100 | dec      | /dɛk/      |
+| 15   |  21 | 00010101 | ded      | /dɛd/      |
+| 16   |  22 | 00010110 | def      | /dɛf/      |
+| 17   |  23 | 00010111 | dem      | /dɛm/      |
+| 18   |  24 | 00011000 | dic      | /dɪk/      |
+| 19   |  25 | 00011001 | did      | /dɪd/      |
+| 1A   |  26 | 00011010 | dif      | /dɪf/      |
+| 1B   |  27 | 00011011 | dim      | /dɪm/      |
+| 1C   |  28 | 00011100 | doc      | /doʊk/     |
+| 1D   |  29 | 00011101 | dod      | /doʊd/     |
+| 1E   |  30 | 00011110 | dof      | /doʊf/     |
+| 1F   |  31 | 00011111 | dom      | /doʊm/     |
+| 20   |  32 | 00100000 | fac      | /fæk/      |
+| 21   |  33 | 00100001 | fad      | /fæd/      |
+| 22   |  34 | 00100010 | faf      | /fæf/      |
+| 23   |  35 | 00100011 | fam      | /fæm/      |
+| 24   |  36 | 00100100 | fec      | /fɛk/      |
+| 25   |  37 | 00100101 | fed      | /fɛd/      |
+| 26   |  38 | 00100110 | fef      | /fɛf/      |
+| 27   |  39 | 00100111 | fem      | /fɛm/      |
+| 28   |  40 | 00101000 | fic      | /fɪk/      |
+| 29   |  41 | 00101001 | fid      | /fɪd/      |
+| 2A   |  42 | 00101010 | fif      | /fɪf/      |
+| 2B   |  43 | 00101011 | fim      | /fɪm/      |
+| 2C   |  44 | 00101100 | foc      | /foʊk/     |
+| 2D   |  45 | 00101101 | fod      | /foʊd/     |
+| 2E   |  46 | 00101110 | fof      | /foʊf/     |
+| 2F   |  47 | 00101111 | fom      | /foʊm/     |
+| 30   |  48 | 00110000 | gac      | /gæk/      |
+| 31   |  49 | 00110001 | gad      | /gæd/      |
+| 32   |  50 | 00110010 | gaf      | /gæf/      |
+| 33   |  51 | 00110011 | gam      | /gæm/      |
+| 34   |  52 | 00110100 | gec      | /gɛk/      |
+| 35   |  53 | 00110101 | ged      | /gɛd/      |
+| 36   |  54 | 00110110 | gef      | /gɛf/      |
+| 37   |  55 | 00110111 | gem      | /gɛm/      |
+| 38   |  56 | 00111000 | gic      | /gɪk/      |
+| 39   |  57 | 00111001 | gid      | /gɪd/      |
+| 3A   |  58 | 00111010 | gif      | /gɪf/      |
+| 3B   |  59 | 00111011 | gim      | /gɪm/      |
+| 3C   |  60 | 00111100 | goc      | /goʊk/     |
+| 3D   |  61 | 00111101 | god      | /goʊd/     |
+| 3E   |  62 | 00111110 | gof      | /goʊf/     |
+| 3F   |  63 | 00111111 | gom      | /goʊm/     |
+| 40   |  64 | 01000000 | hac      | /hæk/      |
+| 41   |  65 | 01000001 | had      | /hæd/      |
+| 42   |  66 | 01000010 | haf      | /hæf/      |
+| 43   |  67 | 01000011 | ham      | /hæm/      |
+| 44   |  68 | 01000100 | hec      | /hɛk/      |
+| 45   |  69 | 01000101 | hed      | /hɛd/      |
+| 46   |  70 | 01000110 | hef      | /hɛf/      |
+| 47   |  71 | 01000111 | hem      | /hɛm/      |
+| 48   |  72 | 01001000 | hic      | /hɪk/      |
+| 49   |  73 | 01001001 | hid      | /hɪd/      |
+| 4A   |  74 | 01001010 | hif      | /hɪf/      |
+| 4B   |  75 | 01001011 | him      | /hɪm/      |
+| 4C   |  76 | 01001100 | hoc      | /hoʊk/     |
+| 4D   |  77 | 01001101 | hod      | /hoʊd/     |
+| 4E   |  78 | 01001110 | hof      | /hoʊf/     |
+| 4F   |  79 | 01001111 | hom      | /hoʊm/     |
+| 50   |  80 | 01010000 | kac      | /kæk/      |
+| 51   |  81 | 01010001 | kad      | /kæd/      |
+| 52   |  82 | 01010010 | kaf      | /kæf/      |
+| 53   |  83 | 01010011 | kam      | /kæm/      |
+| 54   |  84 | 01010100 | kec      | /kɛk/      |
+| 55   |  85 | 01010101 | ked      | /kɛd/      |
+| 56   |  86 | 01010110 | kef      | /kɛf/      |
+| 57   |  87 | 01010111 | kem      | /kɛm/      |
+| 58   |  88 | 01011000 | kic      | /kɪk/      |
+| 59   |  89 | 01011001 | kid      | /kɪd/      |
+| 5A   |  90 | 01011010 | kif      | /kɪf/      |
+| 5B   |  91 | 01011011 | kim      | /kɪm/      |
+| 5C   |  92 | 01011100 | koc      | /koʊk/     |
+| 5D   |  93 | 01011101 | kod      | /koʊd/     |
+| 5E   |  94 | 01011110 | kof      | /koʊf/     |
+| 5F   |  95 | 01011111 | kom      | /koʊm/     |
+| 60   |  96 | 01100000 | lac      | /læk/      |
+| 61   |  97 | 01100001 | lad      | /læd/      |
+| 62   |  98 | 01100010 | laf      | /læf/      |
+| 63   |  99 | 01100011 | lam      | /læm/      |
+| 64   | 100 | 01100100 | lec      | /lɛk/      |
+| 65   | 101 | 01100101 | led      | /lɛd/      |
+| 66   | 102 | 01100110 | lef      | /lɛf/      |
+| 67   | 103 | 01100111 | lem      | /lɛm/      |
+| 68   | 104 | 01101000 | lic      | /lɪk/      |
+| 69   | 105 | 01101001 | lid      | /lɪd/      |
+| 6A   | 106 | 01101010 | lif      | /lɪf/      |
+| 6B   | 107 | 01101011 | lim      | /lɪm/      |
+| 6C   | 108 | 01101100 | loc      | /loʊk/     |
+| 6D   | 109 | 01101101 | lod      | /loʊd/     |
+| 6E   | 110 | 01101110 | lof      | /loʊf/     |
+| 6F   | 111 | 01101111 | lom      | /loʊm/     |
+| 70   | 112 | 01110000 | mac      | /mæk/      |
+| 71   | 113 | 01110001 | mad      | /mæd/      |
+| 72   | 114 | 01110010 | maf      | /mæf/      |
+| 73   | 115 | 01110011 | mam      | /mæm/      |
+| 74   | 116 | 01110100 | mec      | /mɛk/      |
+| 75   | 117 | 01110101 | med      | /mɛd/      |
+| 76   | 118 | 01110110 | mef      | /mɛf/      |
+| 77   | 119 | 01110111 | mem      | /mɛm/      |
+| 78   | 120 | 01111000 | mic      | /mɪk/      |
+| 79   | 121 | 01111001 | mid      | /mɪd/      |
+| 7A   | 122 | 01111010 | mif      | /mɪf/      |
+| 7B   | 123 | 01111011 | mim      | /mɪm/      |
+| 7C   | 124 | 01111100 | moc      | /moʊk/     |
+| 7D   | 125 | 01111101 | mod      | /moʊd/     |
+| 7E   | 126 | 01111110 | mof      | /moʊf/     |
+| 7F   | 127 | 01111111 | mom      | /moʊm/     |
+| 80   | 128 | 10000000 | nac      | /næk/      |
+| 81   | 129 | 10000001 | nad      | /næd/      |
+| 82   | 130 | 10000010 | naf      | /næf/      |
+| 83   | 131 | 10000011 | nam      | /næm/      |
+| 84   | 132 | 10000100 | nec      | /nɛk/      |
+| 85   | 133 | 10000101 | ned      | /nɛd/      |
+| 86   | 134 | 10000110 | nef      | /nɛf/      |
+| 87   | 135 | 10000111 | nem      | /nɛm/      |
+| 88   | 136 | 10001000 | nic      | /nɪk/      |
+| 89   | 137 | 10001001 | nid      | /nɪd/      |
+| 8A   | 138 | 10001010 | nif      | /nɪf/      |
+| 8B   | 139 | 10001011 | nim      | /nɪm/      |
+| 8C   | 140 | 10001100 | noc      | /noʊk/     |
+| 8D   | 141 | 10001101 | nod      | /noʊd/     |
+| 8E   | 142 | 10001110 | nof      | /noʊf/     |
+| 8F   | 143 | 10001111 | nom      | /noʊm/     |
+| 90   | 144 | 10010000 | pac      | /pæk/      |
+| 91   | 145 | 10010001 | pad      | /pæd/      |
+| 92   | 146 | 10010010 | paf      | /pæf/      |
+| 93   | 147 | 10010011 | pam      | /pæm/      |
+| 94   | 148 | 10010100 | pec      | /pɛk/      |
+| 95   | 149 | 10010101 | ped      | /pɛd/      |
+| 96   | 150 | 10010110 | pef      | /pɛf/      |
+| 97   | 151 | 10010111 | pem      | /pɛm/      |
+| 98   | 152 | 10011000 | pic      | /pɪk/      |
+| 99   | 153 | 10011001 | pid      | /pɪd/      |
+| 9A   | 154 | 10011010 | pif      | /pɪf/      |
+| 9B   | 155 | 10011011 | pim      | /pɪm/      |
+| 9C   | 156 | 10011100 | poc      | /poʊk/     |
+| 9D   | 157 | 10011101 | pod      | /poʊd/     |
+| 9E   | 158 | 10011110 | pof      | /poʊf/     |
+| 9F   | 159 | 10011111 | pom      | /poʊm/     |
+| A0   | 160 | 10100000 | rac      | /ræk/      |
+| A1   | 161 | 10100001 | rad      | /ræd/      |
+| A2   | 162 | 10100010 | raf      | /ræf/      |
+| A3   | 163 | 10100011 | ram      | /ræm/      |
+| A4   | 164 | 10100100 | rec      | /rɛk/      |
+| A5   | 165 | 10100101 | red      | /rɛd/      |
+| A6   | 166 | 10100110 | ref      | /rɛf/      |
+| A7   | 167 | 10100111 | rem      | /rɛm/      |
+| A8   | 168 | 10101000 | ric      | /rɪk/      |
+| A9   | 169 | 10101001 | rid      | /rɪd/      |
+| AA   | 170 | 10101010 | rif      | /rɪf/      |
+| AB   | 171 | 10101011 | rim      | /rɪm/      |
+| AC   | 172 | 10101100 | roc      | /roʊk/     |
+| AD   | 173 | 10101101 | rod      | /roʊd/     |
+| AE   | 174 | 10101110 | rof      | /roʊf/     |
+| AF   | 175 | 10101111 | rom      | /roʊm/     |
+| B0   | 176 | 10110000 | sac      | /sæk/      |
+| B1   | 177 | 10110001 | sad      | /sæd/      |
+| B2   | 178 | 10110010 | saf      | /sæf/      |
+| B3   | 179 | 10110011 | sam      | /sæm/      |
+| B4   | 180 | 10110100 | sec      | /sɛk/      |
+| B5   | 181 | 10110101 | sed      | /sɛd/      |
+| B6   | 182 | 10110110 | sef      | /sɛf/      |
+| B7   | 183 | 10110111 | sem      | /sɛm/      |
+| B8   | 184 | 10111000 | sic      | /sɪk/      |
+| B9   | 185 | 10111001 | sid      | /sɪd/      |
+| BA   | 186 | 10111010 | sif      | /sɪf/      |
+| BB   | 187 | 10111011 | sim      | /sɪm/      |
+| BC   | 188 | 10111100 | soc      | /soʊk/     |
+| BD   | 189 | 10111101 | sod      | /soʊd/     |
+| BE   | 190 | 10111110 | sof      | /soʊf/     |
+| BF   | 191 | 10111111 | som      | /soʊm/     |
+| C0   | 192 | 11000000 | tac      | /tæk/      |
+| C1   | 193 | 11000001 | tad      | /tæd/      |
+| C2   | 194 | 11000010 | taf      | /tæf/      |
+| C3   | 195 | 11000011 | tam      | /tæm/      |
+| C4   | 196 | 11000100 | tec      | /tɛk/      |
+| C5   | 197 | 11000101 | ted      | /tɛd/      |
+| C6   | 198 | 11000110 | tef      | /tɛf/      |
+| C7   | 199 | 11000111 | tem      | /tɛm/      |
+| C8   | 200 | 11001000 | tic      | /tɪk/      |
+| C9   | 201 | 11001001 | tid      | /tɪd/      |
+| CA   | 202 | 11001010 | tif      | /tɪf/      |
+| CB   | 203 | 11001011 | tim      | /tɪm/      |
+| CC   | 204 | 11001100 | toc      | /toʊk/     |
+| CD   | 205 | 11001101 | tod      | /toʊd/     |
+| CE   | 206 | 11001110 | tof      | /toʊf/     |
+| CF   | 207 | 11001111 | tom      | /toʊm/     |
+| D0   | 208 | 11010000 | vac      | /væk/      |
+| D1   | 209 | 11010001 | vad      | /væd/      |
+| D2   | 210 | 11010010 | vaf      | /væf/      |
+| D3   | 211 | 11010011 | vam      | /væm/      |
+| D4   | 212 | 11010100 | vec      | /vɛk/      |
+| D5   | 213 | 11010101 | ved      | /vɛd/      |
+| D6   | 214 | 11010110 | vef      | /vɛf/      |
+| D7   | 215 | 11010111 | vem      | /vɛm/      |
+| D8   | 216 | 11011000 | vic      | /vɪk/      |
+| D9   | 217 | 11011001 | vid      | /vɪd/      |
+| DA   | 218 | 11011010 | vif      | /vɪf/      |
+| DB   | 219 | 11011011 | vim      | /vɪm/      |
+| DC   | 220 | 11011100 | voc      | /voʊk/     |
+| DD   | 221 | 11011101 | vod      | /voʊd/     |
+| DE   | 222 | 11011110 | vof      | /voʊf/     |
+| DF   | 223 | 11011111 | vom      | /voʊm/     |
+| E0   | 224 | 11100000 | wac      | /wæk/      |
+| E1   | 225 | 11100001 | wad      | /wæd/      |
+| E2   | 226 | 11100010 | waf      | /wæf/      |
+| E3   | 227 | 11100011 | wam      | /wæm/      |
+| E4   | 228 | 11100100 | wec      | /wɛk/      |
+| E5   | 229 | 11100101 | wed      | /wɛd/      |
+| E6   | 230 | 11100110 | wef      | /wɛf/      |
+| E7   | 231 | 11100111 | wem      | /wɛm/      |
+| E8   | 232 | 11101000 | wic      | /wɪk/      |
+| E9   | 233 | 11101001 | wid      | /wɪd/      |
+| EA   | 234 | 11101010 | wif      | /wɪf/      |
+| EB   | 235 | 11101011 | wim      | /wɪm/      |
+| EC   | 236 | 11101100 | woc      | /woʊk/     |
+| ED   | 237 | 11101101 | wod      | /woʊd/     |
+| EE   | 238 | 11101110 | wof      | /woʊf/     |
+| EF   | 239 | 11101111 | wom      | /woʊm/     |
+| F0   | 240 | 11110000 | zac      | /zæk/      |
+| F1   | 241 | 11110001 | zad      | /zæd/      |
+| F2   | 242 | 11110010 | zaf      | /zæf/      |
+| F3   | 243 | 11110011 | zam      | /zæm/      |
+| F4   | 244 | 11110100 | zec      | /zɛk/      |
+| F5   | 245 | 11110101 | zed      | /zɛd/      |
+| F6   | 246 | 11110110 | zef      | /zɛf/      |
+| F7   | 247 | 11110111 | zem      | /zɛm/      |
+| F8   | 248 | 11111000 | zic      | /zɪk/      |
+| F9   | 249 | 11111001 | zid      | /zɪd/      |
+| FA   | 250 | 11111010 | zif      | /zɪf/      |
+| FB   | 251 | 11111011 | zim      | /zɪm/      |
+| FC   | 252 | 11111100 | zoc      | /zoʊk/     |
+| FD   | 253 | 11111101 | zod      | /zoʊd/     |
+| FE   | 254 | 11111110 | zof      | /zoʊf/     |
+| FF   | 255 | 11111111 | zom      | /zoʊm/     |
+
+## Grouped by Initial Consonant
+
+### B (0x)
+  bac  bad  baf  bam
+  bec  bed  bef  bem
+  bic  bid  bif  bim
+  boc  bod  bof  bom
+
+### D (1x)
+  dac  dad  daf  dam
+  dec  ded  def  dem
+  dic  did  dif  dim
+  doc  dod  dof  dom
+
+### F (2x)
+  fac  fad  faf  fam
+  fec  fed  fef  fem
+  fic  fid  fif  fim
+  foc  fod  fof  fom
+
+### G (3x)
+  gac  gad  gaf  gam
+  gec  ged  gef  gem
+  gic  gid  gif  gim
+  goc  god  gof  gom
+
+### H (4x)
+  hac  had  haf  ham
+  hec  hed  hef  hem
+  hic  hid  hif  him
+  hoc  hod  hof  hom
+
+### K (5x)
+  kac  kad  kaf  kam
+  kec  ked  kef  kem
+  kic  kid  kif  kim
+  koc  kod  kof  kom
+
+### L (6x)
+  lac  lad  laf  lam
+  lec  led  lef  lem
+  lic  lid  lif  lim
+  loc  lod  lof  lom
+
+### M (7x)
+  mac  mad  maf  mam
+  mec  med  mef  mem
+  mic  mid  mif  mim
+  moc  mod  mof  mom
+
+### N (8x)
+  nac  nad  naf  nam
+  nec  ned  nef  nem
+  nic  nid  nif  nim
+  noc  nod  nof  nom
+
+### P (9x)
+  pac  pad  paf  pam
+  pec  ped  pef  pem
+  pic  pid  pif  pim
+  poc  pod  pof  pom
+
+### R (Ax)
+  rac  rad  raf  ram
+  rec  red  ref  rem
+  ric  rid  rif  rim
+  roc  rod  rof  rom
+
+### S (Bx)
+  sac  sad  saf  sam
+  sec  sed  sef  sem
+  sic  sid  sif  sim
+  soc  sod  sof  som
+
+### T (Cx)
+  tac  tad  taf  tam
+  tec  ted  tef  tem
+  tic  tid  tif  tim
+  toc  tod  tof  tom
+
+### V (Dx)
+  vac  vad  vaf  vam
+  vec  ved  vef  vem
+  vic  vid  vif  vim
+  voc  vod  vof  vom
+
+### W (Ex)
+  wac  wad  waf  wam
+  wec  wed  wef  wem
+  wic  wid  wif  wim
+  woc  wod  wof  wom
+
+### Z (Fx)
+  zac  zad  zaf  zam
+  zec  zed  zef  zem
+  zic  zid  zif  zim
+  zoc  zod  zof  zom
+
+## Reverse Index (Syllable → Byte)
+
+| Syllable | Hex  | Dec |
+|----------|------|-----|
+| bac      | 00   |   0 |
+| bad      | 01   |   1 |
+| baf      | 02   |   2 |
+| bam      | 03   |   3 |
+| bec      | 04   |   4 |
+| bed      | 05   |   5 |
+| bef      | 06   |   6 |
+| bem      | 07   |   7 |
+| bic      | 08   |   8 |
+| bid      | 09   |   9 |
+| bif      | 0A   |  10 |
+| bim      | 0B   |  11 |
+| boc      | 0C   |  12 |
+| bod      | 0D   |  13 |
+| bof      | 0E   |  14 |
+| bom      | 0F   |  15 |
+| dac      | 10   |  16 |
+| dad      | 11   |  17 |
+| daf      | 12   |  18 |
+| dam      | 13   |  19 |
+| dec      | 14   |  20 |
+| ded      | 15   |  21 |
+| def      | 16   |  22 |
+| dem      | 17   |  23 |
+| dic      | 18   |  24 |
+| did      | 19   |  25 |
+| dif      | 1A   |  26 |
+| dim      | 1B   |  27 |
+| doc      | 1C   |  28 |
+| dod      | 1D   |  29 |
+| dof      | 1E   |  30 |
+| dom      | 1F   |  31 |
+| fac      | 20   |  32 |
+| fad      | 21   |  33 |
+| faf      | 22   |  34 |
+| fam      | 23   |  35 |
+| fec      | 24   |  36 |
+| fed      | 25   |  37 |
+| fef      | 26   |  38 |
+| fem      | 27   |  39 |
+| fic      | 28   |  40 |
+| fid      | 29   |  41 |
+| fif      | 2A   |  42 |
+| fim      | 2B   |  43 |
+| foc      | 2C   |  44 |
+| fod      | 2D   |  45 |
+| fof      | 2E   |  46 |
+| fom      | 2F   |  47 |
+| gac      | 30   |  48 |
+| gad      | 31   |  49 |
+| gaf      | 32   |  50 |
+| gam      | 33   |  51 |
+| gec      | 34   |  52 |
+| ged      | 35   |  53 |
+| gef      | 36   |  54 |
+| gem      | 37   |  55 |
+| gic      | 38   |  56 |
+| gid      | 39   |  57 |
+| gif      | 3A   |  58 |
+| gim      | 3B   |  59 |
+| goc      | 3C   |  60 |
+| god      | 3D   |  61 |
+| gof      | 3E   |  62 |
+| gom      | 3F   |  63 |
+| hac      | 40   |  64 |
+| had      | 41   |  65 |
+| haf      | 42   |  66 |
+| ham      | 43   |  67 |
+| hec      | 44   |  68 |
+| hed      | 45   |  69 |
+| hef      | 46   |  70 |
+| hem      | 47   |  71 |
+| hic      | 48   |  72 |
+| hid      | 49   |  73 |
+| hif      | 4A   |  74 |
+| him      | 4B   |  75 |
+| hoc      | 4C   |  76 |
+| hod      | 4D   |  77 |
+| hof      | 4E   |  78 |
+| hom      | 4F   |  79 |
+| kac      | 50   |  80 |
+| kad      | 51   |  81 |
+| kaf      | 52   |  82 |
+| kam      | 53   |  83 |
+| kec      | 54   |  84 |
+| ked      | 55   |  85 |
+| kef      | 56   |  86 |
+| kem      | 57   |  87 |
+| kic      | 58   |  88 |
+| kid      | 59   |  89 |
+| kif      | 5A   |  90 |
+| kim      | 5B   |  91 |
+| koc      | 5C   |  92 |
+| kod      | 5D   |  93 |
+| kof      | 5E   |  94 |
+| kom      | 5F   |  95 |
+| lac      | 60   |  96 |
+| lad      | 61   |  97 |
+| laf      | 62   |  98 |
+| lam      | 63   |  99 |
+| lec      | 64   | 100 |
+| led      | 65   | 101 |
+| lef      | 66   | 102 |
+| lem      | 67   | 103 |
+| lic      | 68   | 104 |
+| lid      | 69   | 105 |
+| lif      | 6A   | 106 |
+| lim      | 6B   | 107 |
+| loc      | 6C   | 108 |
+| lod      | 6D   | 109 |
+| lof      | 6E   | 110 |
+| lom      | 6F   | 111 |
+| mac      | 70   | 112 |
+| mad      | 71   | 113 |
+| maf      | 72   | 114 |
+| mam      | 73   | 115 |
+| mec      | 74   | 116 |
+| med      | 75   | 117 |
+| mef      | 76   | 118 |
+| mem      | 77   | 119 |
+| mic      | 78   | 120 |
+| mid      | 79   | 121 |
+| mif      | 7A   | 122 |
+| mim      | 7B   | 123 |
+| moc      | 7C   | 124 |
+| mod      | 7D   | 125 |
+| mof      | 7E   | 126 |
+| mom      | 7F   | 127 |
+| nac      | 80   | 128 |
+| nad      | 81   | 129 |
+| naf      | 82   | 130 |
+| nam      | 83   | 131 |
+| nec      | 84   | 132 |
+| ned      | 85   | 133 |
+| nef      | 86   | 134 |
+| nem      | 87   | 135 |
+| nic      | 88   | 136 |
+| nid      | 89   | 137 |
+| nif      | 8A   | 138 |
+| nim      | 8B   | 139 |
+| noc      | 8C   | 140 |
+| nod      | 8D   | 141 |
+| nof      | 8E   | 142 |
+| nom      | 8F   | 143 |
+| pac      | 90   | 144 |
+| pad      | 91   | 145 |
+| paf      | 92   | 146 |
+| pam      | 93   | 147 |
+| pec      | 94   | 148 |
+| ped      | 95   | 149 |
+| pef      | 96   | 150 |
+| pem      | 97   | 151 |
+| pic      | 98   | 152 |
+| pid      | 99   | 153 |
+| pif      | 9A   | 154 |
+| pim      | 9B   | 155 |
+| poc      | 9C   | 156 |
+| pod      | 9D   | 157 |
+| pof      | 9E   | 158 |
+| pom      | 9F   | 159 |
+| rac      | A0   | 160 |
+| rad      | A1   | 161 |
+| raf      | A2   | 162 |
+| ram      | A3   | 163 |
+| rec      | A4   | 164 |
+| red      | A5   | 165 |
+| ref      | A6   | 166 |
+| rem      | A7   | 167 |
+| ric      | A8   | 168 |
+| rid      | A9   | 169 |
+| rif      | AA   | 170 |
+| rim      | AB   | 171 |
+| roc      | AC   | 172 |
+| rod      | AD   | 173 |
+| rof      | AE   | 174 |
+| rom      | AF   | 175 |
+| sac      | B0   | 176 |
+| sad      | B1   | 177 |
+| saf      | B2   | 178 |
+| sam      | B3   | 179 |
+| sec      | B4   | 180 |
+| sed      | B5   | 181 |
+| sef      | B6   | 182 |
+| sem      | B7   | 183 |
+| sic      | B8   | 184 |
+| sid      | B9   | 185 |
+| sif      | BA   | 186 |
+| sim      | BB   | 187 |
+| soc      | BC   | 188 |
+| sod      | BD   | 189 |
+| sof      | BE   | 190 |
+| som      | BF   | 191 |
+| tac      | C0   | 192 |
+| tad      | C1   | 193 |
+| taf      | C2   | 194 |
+| tam      | C3   | 195 |
+| tec      | C4   | 196 |
+| ted      | C5   | 197 |
+| tef      | C6   | 198 |
+| tem      | C7   | 199 |
+| tic      | C8   | 200 |
+| tid      | C9   | 201 |
+| tif      | CA   | 202 |
+| tim      | CB   | 203 |
+| toc      | CC   | 204 |
+| tod      | CD   | 205 |
+| tof      | CE   | 206 |
+| tom      | CF   | 207 |
+| vac      | D0   | 208 |
+| vad      | D1   | 209 |
+| vaf      | D2   | 210 |
+| vam      | D3   | 211 |
+| vec      | D4   | 212 |
+| ved      | D5   | 213 |
+| vef      | D6   | 214 |
+| vem      | D7   | 215 |
+| vic      | D8   | 216 |
+| vid      | D9   | 217 |
+| vif      | DA   | 218 |
+| vim      | DB   | 219 |
+| voc      | DC   | 220 |
+| vod      | DD   | 221 |
+| vof      | DE   | 222 |
+| vom      | DF   | 223 |
+| wac      | E0   | 224 |
+| wad      | E1   | 225 |
+| waf      | E2   | 226 |
+| wam      | E3   | 227 |
+| wec      | E4   | 228 |
+| wed      | E5   | 229 |
+| wef      | E6   | 230 |
+| wem      | E7   | 231 |
+| wic      | E8   | 232 |
+| wid      | E9   | 233 |
+| wif      | EA   | 234 |
+| wim      | EB   | 235 |
+| woc      | EC   | 236 |
+| wod      | ED   | 237 |
+| wof      | EE   | 238 |
+| wom      | EF   | 239 |
+| zac      | F0   | 240 |
+| zad      | F1   | 241 |
+| zaf      | F2   | 242 |
+| zam      | F3   | 243 |
+| zec      | F4   | 244 |
+| zed      | F5   | 245 |
+| zef      | F6   | 246 |
+| zem      | F7   | 247 |
+| zic      | F8   | 248 |
+| zid      | F9   | 249 |
+| zif      | FA   | 250 |
+| zim      | FB   | 251 |
+| zoc      | FC   | 252 |
+| zod      | FD   | 253 |
+| zof      | FE   | 254 |
+| zom      | FF   | 255 |
