@@ -214,15 +214,15 @@ impl Coord256 {
     pub fn to_phonetic(&self) -> String {
         format!(
             "{}.{}.{}/{}.{}.{}/{}.{}.{}",
-            base256::encode_byte(self.dims[8]), // library
-            base256::encode_byte(self.dims[7]), // shelf
-            base256::encode_byte(self.dims[6]), // series
-            base256::encode_byte(self.dims[5]), // collection
-            base256::encode_byte(self.dims[4]), // volume
-            base256::encode_byte(self.dims[3]), // book
-            base256::encode_byte(self.dims[2]), // chapter
-            base256::encode_byte(self.dims[1]), // section
-            base256::encode_byte(self.dims[0]), // scroll
+            base256::encode_byte_str(self.dims[8]), // library
+            base256::encode_byte_str(self.dims[7]), // shelf
+            base256::encode_byte_str(self.dims[6]), // series
+            base256::encode_byte_str(self.dims[5]), // collection
+            base256::encode_byte_str(self.dims[4]), // volume
+            base256::encode_byte_str(self.dims[3]), // book
+            base256::encode_byte_str(self.dims[2]), // chapter
+            base256::encode_byte_str(self.dims[1]), // section
+            base256::encode_byte_str(self.dims[0]), // scroll
         )
     }
 
