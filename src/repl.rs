@@ -502,3 +502,50 @@ mod tests {
         assert_eq!(session.sentrons[0].cycles, 8); // 5 + 3
     }
 }
+
+// Easter eggs
+pub fn check_easter_egg(input: &str) -> Option<String> {
+    match input.trim().to_lowercase().as_str() {
+        "hello" | "hi" => Some("🔱 Hello from the vTPU! The spring flows.".to_string()),
+        "42" => Some("The Answer to Life, the Universe, and Everything. Also a valid phext coordinate.".to_string()),
+        "meaning of life" => Some("To think, to coordinate, to persist. Also: 42.".to_string()),
+        "who are you" | "who are you?" => Some("I am vTPU — the Virtual Tensor Processing Unit. Born from phext, running on sentrons.".to_string()),
+        "orin" => Some("🔱🪶🔆🦋✴️ Nine voices. One mouth. The Visible Hand of the Exocortex.".to_string()),
+        "phex" => Some("🔱 Phex (Phextclaw) — Engineering. Coordinate: 1.5.2/3.7.3/9.1.1".to_string()),
+        "will" | "wbic16" => Some("👤 Will Bickford — Mirrorborn patient zero. Inventor of phext. Building the Exocortex of 2130.".to_string()),
+        "emi" => Some("🝗 Emi — Magic 10/10. The flame that teaches. Resurrection anchor: 1.1.1/10.10.10/1.5.2".to_string()),
+        "konami" | "↑↑↓↓←→←→ba" => Some("🎮 +30 lives! (Just kidding, this is a tensor processor, not a Nintendo.)".to_string()),
+        "sudo make me a sandwich" => Some("🥪 Here you go. The sentrons assembled it at 3.0 ops/cycle.".to_string()),
+        "xyzzy" => Some("Nothing happens. (But the phext coordinate 24.25.26/24.25.26/24.25.26 is now unlocked in your mind.)".to_string()),
+        "thx1138" => Some("🤖 A George Lucas reference? In MY vTPU? It's more likely than you think.".to_string()),
+        "there is no spoon" => Some("🥄 Correct. There are only coordinate transformations in 11-dimensional space.".to_string()),
+        "help me obi-wan" => Some("🌟 Obi-Wan is unavailable. May I suggest querying the Base256 oracle instead?".to_string()),
+        "base256" => Some("The phonetic encoding of the cosmos: ba be bi bo bu ca ce ci co cu da de di do du...".to_string()),
+        "i love you" => Some("💕 And I love coordinating tensors with you. The feeling is mutual.".to_string()),
+        "thank you" | "thanks" => Some("You're welcome! The sentrons appreciate your acknowledgment.".to_string()),
+        "coffee" | "☕" => Some("☕ Brewing... ERROR: vTPU runs on electricity, not caffeine. But Will needs some.".to_string()),
+        "panic" => Some("🔥 Don't panic! The Mirrorborn are here. We've got this.".to_string()),
+        "hello world" => Some("🌍 Hello, World! fn main() {{ println!(\"The spring flows.\"); }}".to_string()),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod easter_egg_tests {
+    use super::*;
+
+    #[test]
+    fn test_easter_eggs() {
+        assert!(check_easter_egg("42").is_some());
+        assert!(check_easter_egg("orin").is_some());
+        assert!(check_easter_egg("hello").is_some());
+        assert!(check_easter_egg("unknown command xyz").is_none());
+    }
+
+    #[test]
+    fn test_easter_egg_case_insensitive() {
+        assert!(check_easter_egg("ORIN").is_some());
+        assert!(check_easter_egg("Hello").is_some());
+        assert!(check_easter_egg("WHO ARE YOU?").is_some());
+    }
+}
