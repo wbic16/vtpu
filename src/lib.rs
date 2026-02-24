@@ -143,3 +143,5 @@ pub mod demon;
 pub use demon::{Demon, Placeable, Rejection, AdmitResult};
 pub mod ttsm;
 pub use ttsm::{TTSM, TemporalBlockId, TemporalBlock, SpeculativeState, TTSMError, TTSMResult, TTSMStats};
+pub mod epoch_ppt;
+pub use epoch_ppt::{EpochPPT, EpochView, EpochId, EpochError, EpochResult, EpochPPTStats};
