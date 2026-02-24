@@ -368,6 +368,34 @@ mod tests {
     use super::*;
     
     #[test]
+    fn test_perf_metrics_ipc() {
+        let m = PerfMetrics { cycles: 1000, instructions: 2500, cache_references: 100, cache_misses: 5 };
+        assert!((m.ipc() - 2.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_perf_metrics_zero_cycles() {
+        let m = PerfMetrics { cycles: 0, instructions: 0, cache_references: 0, cache_misses: 0 };
+        assert_eq!(m.ipc(), 0.0);
+        assert_eq!(m.cache_hit_rate(), 0.0);
+        assert_eq!(m.cache_miss_rate(), 1.0); // 1 - 0 = 1
+    }
+
+    #[test]
+    fn test_perf_metrics_cache_rates() {
+        let m = PerfMetrics { cycles: 100, instructions: 100, cache_references: 200, cache_misses: 50 };
+        assert!((m.cache_hit_rate() - 0.75).abs() < 1e-9);
+        assert!((m.cache_miss_rate() - 0.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_perf_metrics_perfect_cache() {
+        let m = PerfMetrics { cycles: 100, instructions: 100, cache_references: 1000, cache_misses: 0 };
+        assert_eq!(m.cache_hit_rate(), 1.0);
+        assert_eq!(m.cache_miss_rate(), 0.0);
+    }
+
+    #[test]
     #[ignore] // Requires Linux + perf permissions
     fn test_perf_counters() {
         let perf = PerfCounters::new().expect("Failed to create perf counters");

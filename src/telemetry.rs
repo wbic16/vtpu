@@ -283,6 +283,63 @@ mod tests {
         let json = telemetry.to_json();
         assert!(json.contains("\"ops_per_cycle\": 3.00"));
     }
+
+    #[test]
+    fn test_zero_state() {
+        let t = VtpuTelemetry::new();
+        assert_eq!(t.total_ops(), 0);
+        assert_eq!(t.total_cycles(), 0);
+        assert_eq!(t.ops_per_cycle(), 0.0);
+        assert_eq!(t.error_count(), 0);
+    }
+
+    #[test]
+    fn test_energy_and_power() {
+        let t = VtpuTelemetry::new();
+        // Record 20 watts worth of energy over time
+        t.record_energy(5_000_000); // 5 seconds worth at some rate
+        // power_watts depends on uptime; just verify it's callable
+        let _p = t.power_watts();
+        let _e = t.mops_per_watt();
+    }
+
+    #[test]
+    fn test_error_counting() {
+        let t = VtpuTelemetry::new();
+        t.record_error();
+        t.record_error();
+        t.record_error();
+        assert_eq!(t.error_count(), 3);
+    }
+
+    #[test]
+    fn test_combined_cache_hit_rate() {
+        let t = VtpuTelemetry::new();
+        // L1: 80%, L2: 90%, L3: 95%
+        for _ in 0..80 { t.record_cache_hit(0); }
+        for _ in 0..20 { t.record_cache_miss(0); }
+        for _ in 0..90 { t.record_cache_hit(1); }
+        for _ in 0..10 { t.record_cache_miss(1); }
+        for _ in 0..95 { t.record_cache_hit(2); }
+        for _ in 0..5 { t.record_cache_miss(2); }
+        let combined = t.combined_cache_hit_rate();
+        // Combined should be weighted average
+        assert!(combined > 0.0 && combined <= 1.0);
+    }
+
+    #[test]
+    fn test_throughput_gops() {
+        let t = VtpuTelemetry::new();
+        t.record_ops(1_000_000_000);
+        // throughput depends on uptime; just verify non-panic
+        let _g = t.throughput_gops();
+    }
+
+    #[test]
+    fn test_default_trait() {
+        let t = VtpuTelemetry::default();
+        assert_eq!(t.total_ops(), 0);
+    }
 }
 
 #[cfg(test)]

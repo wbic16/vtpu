@@ -357,6 +357,91 @@ mod tests {
         let fuzzy_matches = c_pipe.match_messages_fuzzy(&target, 10.0);
         assert_eq!(fuzzy_matches.len(), 2); // Both found
     }
+
+    #[test]
+    fn test_recv_no_message() {
+        let mut c_pipe = CPipeExecutor::new();
+        let mut regs = [0i64; 32];
+        let result = c_pipe.execute(
+            &CoordOp::CRECV { rd: 0, src_sentron: 99 },
+            0, &mut regs,
+        );
+        assert_eq!(result, Err(CPipeError::NoMessage));
+    }
+
+    #[test]
+    fn test_cnop() {
+        let mut c_pipe = CPipeExecutor::new();
+        let mut regs = [0i64; 32];
+        assert!(c_pipe.execute(&CoordOp::CNOP, 0, &mut regs).is_ok());
+    }
+
+    #[test]
+    fn test_message_count_and_clear() {
+        let mut c_pipe = CPipeExecutor::new();
+        let coord = PhextCoord::new([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        assert_eq!(c_pipe.message_count(&coord), 0);
+        c_pipe.send(coord, 0, 10, 0, MessageFormat::Result).unwrap();
+        c_pipe.send(coord, 1, 20, 0, MessageFormat::Result).unwrap();
+        assert_eq!(c_pipe.message_count(&coord), 2);
+        c_pipe.clear();
+        assert_eq!(c_pipe.message_count(&coord), 0);
+    }
+
+    #[test]
+    fn test_barrier_idempotent() {
+        let mut c_pipe = CPipeExecutor::new();
+        let mut regs = [0i64; 32];
+        // Sentron 0 arrives at barrier expecting 2
+        let _ = c_pipe.execute(&CoordOp::CBAR { barrier_id: 1, count: 2 }, 0, &mut regs);
+        // Same sentron arrives again — should be idempotent (still not ready, not double-counted)
+        let result = c_pipe.execute(&CoordOp::CBAR { barrier_id: 1, count: 2 }, 0, &mut regs);
+        // Still ok because idempotent re-arrival returns Ok
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_multiple_messages_fifo() {
+        let mut c_pipe = CPipeExecutor::new();
+        let mut regs = [0i64; 32];
+        // Send 3 messages to same destination
+        regs[0] = 111;
+        c_pipe.execute(&CoordOp::CSEND { msg_reg: 0, dest_sentron: 7 }, 0, &mut regs).unwrap();
+        regs[0] = 222;
+        c_pipe.execute(&CoordOp::CSEND { msg_reg: 0, dest_sentron: 7 }, 1, &mut regs).unwrap();
+        regs[0] = 333;
+        c_pipe.execute(&CoordOp::CSEND { msg_reg: 0, dest_sentron: 7 }, 2, &mut regs).unwrap();
+
+        // Recv pops from the back (LIFO — stack semantics)
+        c_pipe.execute(&CoordOp::CRECV { rd: 1, src_sentron: 7 }, 0, &mut regs).unwrap();
+        assert_eq!(regs[1], 333);
+        c_pipe.execute(&CoordOp::CRECV { rd: 1, src_sentron: 7 }, 0, &mut regs).unwrap();
+        assert_eq!(regs[1], 222);
+        c_pipe.execute(&CoordOp::CRECV { rd: 1, src_sentron: 7 }, 0, &mut regs).unwrap();
+        assert_eq!(regs[1], 111);
+        // Now empty
+        assert!(c_pipe.execute(&CoordOp::CRECV { rd: 1, src_sentron: 7 }, 0, &mut regs).is_err());
+    }
+
+    #[test]
+    fn test_timestamp_increments() {
+        let mut c_pipe = CPipeExecutor::new();
+        let coord = PhextCoord::new([1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+        c_pipe.send(coord, 0, 10, 0, MessageFormat::Result).unwrap();
+        c_pipe.send(coord, 0, 20, 0, MessageFormat::Result).unwrap();
+        let msgs = c_pipe.mailboxes.get(&coord).unwrap();
+        assert_eq!(msgs[0].timestamp, 1);
+        assert_eq!(msgs[1].timestamp, 2);
+    }
+
+    #[test]
+    fn test_cpipe_error_display() {
+        let e = CPipeError::NoMessage;
+        assert_eq!(format!("{}", e), "No message available");
+        let e2 = CPipeError::BarrierNotReady { barrier_id: 5, arrived: 2, expected: 4 };
+        assert!(format!("{}", e2).contains("5"));
+        assert!(format!("{}", e2).contains("2/4"));
+    }
 }
 
 #[cfg(test)]

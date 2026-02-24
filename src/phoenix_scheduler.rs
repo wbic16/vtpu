@@ -486,4 +486,74 @@ mod tests {
         let history = phoenix.decision_history(sentron.sentron_id);
         assert_eq!(history.len(), 1);
     }
+
+    #[test]
+    fn sentron_metrics_cache_hit_rate() {
+        let m = mock_sentron_metrics();
+        // 90+9 hits / (90+10+9+1) = 99/110 ≈ 0.9
+        assert!(m.cache_hit_rate() > 0.89 && m.cache_hit_rate() < 0.91);
+    }
+
+    #[test]
+    fn sentron_metrics_contention_score() {
+        let m = mock_sentron_metrics();
+        let c = m.contention_score();
+        assert!(c >= 0.0 && c <= 1.0);
+    }
+
+    #[test]
+    fn sentron_metrics_stall_rate() {
+        let m = mock_sentron_metrics();
+        // 5 stall / 50 cycles = 0.1
+        assert!((m.stall_rate() - 0.1).abs() < 1e-9);
+    }
+
+    #[test]
+    fn recommend_action_none_when_good() {
+        let decision = NineColorDecision {
+            ilp_score: 1.0,
+            core_affinity: 1.0,
+            smt_pairing: 1.0,
+            cache_locality: 1.0,
+            numa_locality: 1.0,
+            temporal_trend: 1.0,
+            thermal_delta: 1.0,
+            power_efficiency: 1.0,
+            cluster_balance: 1.0,
+        };
+        assert!(decision.recommend_action(0, 0, 0.75).is_none());
+    }
+
+    #[test]
+    fn nine_color_stats_from_decisions() {
+        let d1 = NineColorDecision {
+            ilp_score: 0.8, core_affinity: 0.7, smt_pairing: 0.6,
+            cache_locality: 0.9, numa_locality: 1.0, temporal_trend: 0.5,
+            thermal_delta: 0.8, power_efficiency: 0.9, cluster_balance: 0.7,
+        };
+        let d2 = NineColorDecision {
+            ilp_score: 1.0, core_affinity: 0.9, smt_pairing: 0.8,
+            cache_locality: 0.95, numa_locality: 1.0, temporal_trend: 0.7,
+            thermal_delta: 0.9, power_efficiency: 1.0, cluster_balance: 0.8,
+        };
+        let stats = NineColorStats::from_decisions(&[d1, d2]);
+        assert!(stats.avg_ilp > 0.0); // verify it computed
+        assert!(stats.avg_harmonic_score > 0.0);
+    }
+
+    #[test]
+    fn phoenix_scheduler_multiple_sentrons() {
+        let mut phoenix = PhoenixScheduler::new(0.75);
+        let mut s1 = mock_sentron_metrics();
+        let mut s2 = mock_sentron_metrics();
+        s1.sentron_id = 1;
+        s2.sentron_id = 2;
+        let core = mock_core_metrics();
+        phoenix.decide(&s1, &core);
+        phoenix.decide(&s2, &core);
+        phoenix.decide(&s1, &core);
+        assert_eq!(phoenix.decision_history(1).len(), 2);
+        assert_eq!(phoenix.decision_history(2).len(), 1);
+        assert_eq!(phoenix.decision_history(99).len(), 0);
+    }
 }

@@ -75,6 +75,7 @@ pub mod hdc_optimized;
 pub mod analysis;
 pub mod curves;
 pub mod c_pipe;
+pub mod cost;
 pub mod synchronicity;
 pub mod iching;
 pub mod harmonic;
