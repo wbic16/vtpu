@@ -194,6 +194,102 @@ mod tests {
         use std::mem;
         assert_eq!(mem::align_of::<SIW>(), 64);
     }
+
+    #[test]
+    fn test_mode_bits_all_active() {
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 },
+            SparseOp::SGATHER { rd: 4, coord_idx: 0, width: 64 },
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 },
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.mode_bits(), 0b111); // all 3 pipes active
+    }
+
+    #[test]
+    fn test_mode_bits_d_only() {
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 },
+            SparseOp::SNOP,
+            CoordOp::CNOP,
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.mode_bits(), 0b001); // only D active
+    }
+
+    #[test]
+    fn test_mode_bits_nop() {
+        let nop = SIW::nop();
+        assert_eq!(nop.mode_bits(), 0b000); // nothing active
+    }
+
+    #[test]
+    fn test_octawire_family_encoding() {
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 },  // Arithmetic = 0
+            SparseOp::SSCATTR { coord_idx: 0, rs: 1, width: 64 }, // Store = 1
+            CoordOp::CBAR { barrier_id: 0, count: 4 },  // Barrier = 2
+            PhextCoord::zero(),
+        );
+        assert_eq!(siw.d_fam, 0); // Arithmetic family
+        assert_eq!(siw.s_fam, 1); // Store family
+        assert_eq!(siw.c_fam, 2); // Barrier family
+    }
+
+    #[test]
+    fn test_nop_family_encoding() {
+        let nop = SIW::nop();
+        assert_eq!(nop.d_fam, 4); // NOP sentinel
+        assert_eq!(nop.s_fam, 4);
+        assert_eq!(nop.c_fam, 4);
+    }
+
+    #[test]
+    fn test_cross_pipe_dependency() {
+        // D depends on prior S (bit 3), S depends on prior D (bit 4)
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 },
+            SparseOp::SGATHER { rd: 4, coord_idx: 0, width: 64 },
+            CoordOp::CNOP,
+            PhextCoord::zero(),
+        ).with_deps(0x18); // bits 3 and 4
+
+        // D needs prior S: not ready if S incomplete
+        assert!(!siw.d_ready(true, false));
+        assert!(siw.d_ready(true, true));
+
+        // S needs prior D: not ready if D incomplete
+        assert!(!siw.s_ready(true, false));
+        assert!(siw.s_ready(true, true));
+    }
+
+    #[test]
+    fn test_c_pipe_dependency_on_d() {
+        // C depends on prior D (bit 5)
+        let siw = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SNOP,
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 },
+            PhextCoord::zero(),
+        ).with_deps(0x20);
+
+        assert!(!siw.c_ready(true, false)); // prior D not ready
+        assert!(siw.c_ready(true, true));   // prior D ready
+    }
+
+    #[test]
+    fn test_no_deps_always_ready() {
+        let siw = SIW::new(
+            DenseOp::DADD { rd: 1, rs1: 2, rs2: 3 },
+            SparseOp::SGATHER { rd: 4, coord_idx: 0, width: 64 },
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 },
+            PhextCoord::zero(),
+        );
+        // No deps → always ready regardless of prior state
+        assert!(siw.d_ready(false, false));
+        assert!(siw.s_ready(false, false));
+        assert!(siw.c_ready(false, false));
+    }
 }
 
 #[cfg(test)]

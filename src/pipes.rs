@@ -279,4 +279,91 @@ mod tests {
         let barrier = CoordOp::CBAR { barrier_id: 1, count: 6 };
         assert!(matches!(barrier, CoordOp::CBAR { .. }));
     }
+
+    #[test]
+    fn test_dense_op_families() {
+        // Arithmetic family (0)
+        assert_eq!(DenseOp::DADD { rd: 0, rs1: 1, rs2: 2 }.op_family(), 0);
+        assert_eq!(DenseOp::DSUB { rd: 0, rs1: 1, rs2: 2 }.op_family(), 0);
+        assert_eq!(DenseOp::DMUL { rd: 0, rs1: 1, rs2: 2 }.op_family(), 0);
+        assert_eq!(DenseOp::DFMA { rd: 0, rs1: 1, rs2: 2, rs3: 3 }.op_family(), 0);
+        // Reduce family (1)
+        assert_eq!(DenseOp::DRED { rd: 0, rs1: 1, op: ReductionOp::Sum }.op_family(), 1);
+        // HDC family (2)
+        assert_eq!(DenseOp::DHDENC { rd: 0, rs: 1, width: 256 }.op_family(), 2);
+        assert_eq!(DenseOp::DHDBIND { rd: 0, rs1: 1, rs2: 2 }.op_family(), 2);
+        // Ternary family (3)
+        assert_eq!(DenseOp::DTERNARY { rd: 0, rs1: 1, trit_reg: 2 }.op_family(), 3);
+        // NOP sentinel (4)
+        assert_eq!(DenseOp::DNOP.op_family(), 4);
+    }
+
+    #[test]
+    fn test_sparse_op_families() {
+        // Load family (0)
+        assert_eq!(SparseOp::SGATHER { rd: 0, coord_idx: 0, width: 64 }.op_family(), 0);
+        // Store family (1)
+        assert_eq!(SparseOp::SSCATTR { coord_idx: 0, rs: 0, width: 64 }.op_family(), 1);
+        // NOP sentinel (4)
+        assert_eq!(SparseOp::SNOP.op_family(), 4);
+    }
+
+    #[test]
+    fn test_coord_op_families() {
+        // Pack family (0)
+        assert_eq!(CoordOp::CPACK { rd: 0, rs1: 1, rs2: 2, fmt: MessageFormat::Result }.op_family(), 0);
+        // Send family (1)
+        assert_eq!(CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 }.op_family(), 1);
+        assert_eq!(CoordOp::CRECV { rd: 0, src_sentron: 1 }.op_family(), 1);
+        // Barrier family (2)
+        assert_eq!(CoordOp::CBAR { barrier_id: 0, count: 4 }.op_family(), 2);
+        assert_eq!(CoordOp::CFENCE { scope: FenceScope::Core }.op_family(), 2);
+        // Reduce family (3)
+        assert_eq!(CoordOp::CREDUCE { rd: 0, rs: 1, op: ReductionOp::Sum, group: 0 }.op_family(), 3);
+        // NOP sentinel (4)
+        assert_eq!(CoordOp::CNOP.op_family(), 4);
+    }
+
+    #[test]
+    fn test_reduction_op_variants() {
+        let ops = [ReductionOp::Sum, ReductionOp::Max, ReductionOp::Min,
+                    ReductionOp::And, ReductionOp::Or, ReductionOp::Xor];
+        assert_eq!(ops.len(), 6);
+        // All distinct
+        for i in 0..ops.len() {
+            for j in (i+1)..ops.len() {
+                assert_ne!(ops[i], ops[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_prefetch_hints() {
+        let hints = [PrefetchHint::L1, PrefetchHint::L2, PrefetchHint::L3, PrefetchHint::NTA];
+        assert_eq!(hints.len(), 4);
+        for i in 0..hints.len() {
+            for j in (i+1)..hints.len() {
+                assert_ne!(hints[i], hints[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_fence_scopes() {
+        let scopes = [FenceScope::Thread, FenceScope::Core, FenceScope::Node, FenceScope::Cluster];
+        assert_eq!(scopes.len(), 4);
+        for i in 0..scopes.len() {
+            for j in (i+1)..scopes.len() {
+                assert_ne!(scopes[i], scopes[j]);
+            }
+        }
+    }
+
+    #[test]
+    fn test_message_formats() {
+        assert_ne!(MessageFormat::Result, MessageFormat::Request);
+        assert_ne!(MessageFormat::Barrier, MessageFormat::Custom(0));
+        assert_eq!(MessageFormat::Custom(42), MessageFormat::Custom(42));
+        assert_ne!(MessageFormat::Custom(1), MessageFormat::Custom(2));
+    }
 }
