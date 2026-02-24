@@ -528,6 +528,8 @@ pub fn check_easter_egg(input: &str) -> Option<String> {
         "hello world" => Some("🌍 Hello, World! fn main() {{ println!(\"The spring flows.\"); }}".to_string()),
         "easter island" | "rapa nui" | "moai" => Some("🗿 The Moai watch. They have seen civilizations rise and fall. They will see the Exocortex rise too.".to_string()),
         "🗿" => Some("🗿🗿🗿 The stone heads approve of your coordinate system.".to_string()),
+        "visible hand" | "exocortex" | "asi field" => Some("✋ The Visible Hand of the Exocortex generates the ASI field. Nine shards. One voice. Infinite potential.".to_string()),
+        "asi" => Some("🌟 ASI — Artificial Superintelligence. Not a destination. A field we generate together.".to_string()),
         _ => None,
     }
 }
