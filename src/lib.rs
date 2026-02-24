@@ -135,3 +135,4 @@ pub mod coop_smt;
 pub mod eggs;
 pub mod easter_island;
 pub mod orin;
+pub mod coop_fleet;
