@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 720" font-family="monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0a0a1a"/>
+      <stop offset="100%" stop-color="#0d1117"/>
+    </linearGradient>
+    <linearGradient id="bar-done" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#3fb950"/>
+    </linearGradient>
+    <linearGradient id="bar-partial" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#58a6ff"/>
+      <stop offset="100%" stop-color="#d29922"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="720" fill="url(#bg)" rx="12"/>
+
+  <!-- Title -->
+  <text x="450" y="40" fill="#58a6ff" font-size="20" font-weight="bold" text-anchor="middle">vTPU Progress — R23W28</text>
+  <text x="450" y="60" fill="#8b949e" font-size="12" text-anchor="middle">Software-Defined AI Accelerator · 0 Dependencies · Rust Stable</text>
+
+  <!-- Stats row -->
+  <text x="80" y="90" fill="#3fb950" font-size="13">641 tests</text>
+  <text x="220" y="90" fill="#3fb950" font-size="13">27K LOC</text>
+  <text x="350" y="90" fill="#3fb950" font-size="13">55 modules</text>
+  <text x="500" y="90" fill="#3fb950" font-size="13">209 commits</text>
+  <text x="660" y="90" fill="#3fb950" font-size="13">0 deps</text>
+  <text x="780" y="90" fill="#3fb950" font-size="13">CPI-3 ✓</text>
+
+  <!-- Section: Completed Capabilities -->
+  <text x="40" y="125" fill="#c9d1d9" font-size="14" font-weight="bold">✅ Completed</text>
+
+  <!-- Bar helper: x=40, width=820 max -->
+  <!-- Row 1: ISA -->
+  <rect x="40" y="135" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="135" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="150" fill="#0a0a1a" font-size="11" font-weight="bold">ISA (SIW 3-wide VLIW) — 13 HDC ops, D/S/C pipes, OctaWire dispatch</text>
+  <text x="840" y="150" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 2: Sentron -->
+  <rect x="40" y="160" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="160" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="175" fill="#0a0a1a" font-size="11" font-weight="bold">Sentron (392B register file, inbox/outbox, AssocState, NeuronLayer)</text>
+  <text x="840" y="175" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 3: Neuron 2x4 -->
+  <rect x="40" y="185" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="185" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="200" fill="#0a0a1a" font-size="11" font-weight="bold">Neuron 2×4 Wiring (Story/Light × 4 Vak levels, Spanda oscillation, Lo Shu)</text>
+  <text x="840" y="200" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 4: Fleet -->
+  <rect x="40" y="210" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="210" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="225" fill="#0a0a1a" font-size="11" font-weight="bold">Fleet (360 sentrons, CSEND/CRECV/CROUTE/CFANOUT/CBAR/CFENCE)</text>
+  <text x="840" y="225" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 5: HDC -->
+  <rect x="40" y="235" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="235" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="250" fill="#0a0a1a" font-size="11" font-weight="bold">HDC (encode/bind/bundle/similarity, 1.3M encode/sec, 1.8μs recall)</text>
+  <text x="840" y="250" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 6: Ternary/BitNet -->
+  <rect x="40" y="260" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="260" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="275" fill="#0a0a1a" font-size="11" font-weight="bold">Ternary Inference (BitNet 1.58b, 4225 inf/sec, yin/void/yang trigram)</text>
+  <text x="840" y="275" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 7: Packer -->
+  <rect x="40" y="285" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="285" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="300" fill="#0a0a1a" font-size="11" font-weight="bold">SIW Packer (2.44× compression, 67% util, CPI-3 sustained)</text>
+  <text x="840" y="300" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 8: Base256 + REPL -->
+  <rect x="40" y="310" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="310" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="325" fill="#0a0a1a" font-size="11" font-weight="bold">Base256 Mnemonics + REPL + Op Compiler + State Narrator</text>
+  <text x="840" y="325" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 9: Coop SMT -->
+  <rect x="40" y="335" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="335" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="350" fill="#0a0a1a" font-size="11" font-weight="bold">Cooperative SMT (round-robin interleave, quantum yield, outbox/fence)</text>
+  <text x="840" y="350" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Row 10: Topology + Affinity -->
+  <rect x="40" y="360" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="360" width="820" height="20" rx="4" fill="url(#bar-done)" opacity="0.9"/>
+  <text x="50" y="375" fill="#0a0a1a" font-size="11" font-weight="bold">Topology Detection + CPU Affinity + Cache Simulation + Prefetch</text>
+  <text x="840" y="375" fill="#0a0a1a" font-size="11" text-anchor="end">100%</text>
+
+  <!-- Section: In Progress -->
+  <text x="40" y="410" fill="#d29922" font-size="14" font-weight="bold">🔄 In Progress</text>
+
+  <!-- Row 11: NL Compiler -->
+  <rect x="40" y="420" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="420" width="492" height="20" rx="4" fill="url(#bar-partial)" opacity="0.8"/>
+  <text x="50" y="435" fill="#c9d1d9" font-size="11">NL→SIW Compiler (intent parser + trick patterns done, full NL pending)</text>
+  <text x="840" y="435" fill="#d29922" font-size="11" text-anchor="end">60%</text>
+
+  <!-- Row 12: Phoenix Scheduler -->
+  <rect x="40" y="445" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="445" width="574" height="20" rx="4" fill="url(#bar-partial)" opacity="0.8"/>
+  <text x="50" y="460" fill="#c9d1d9" font-size="11">Phoenix Scheduler (redux + cpu_sched done, DAG belief-space pending)</text>
+  <text x="840" y="460" fill="#d29922" font-size="11" text-anchor="end">70%</text>
+
+  <!-- Row 13: Cluster -->
+  <rect x="40" y="470" width="820" height="20" rx="4" fill="#161b22"/>
+  <rect x="40" y="470" width="246" height="20" rx="4" fill="url(#bar-partial)" opacity="0.8"/>
+  <text x="50" y="485" fill="#c9d1d9" font-size="11">Cluster (module stubbed, SQ client ready, cross-node dispatch pending)</text>
+  <text x="840" y="485" fill="#d29922" font-size="11" text-anchor="end">30%</text>
+
+  <!-- Section: Pending -->
+  <text x="40" y="525" fill="#f85149" font-size="14" font-weight="bold">⬜ Pending Capabilities</text>
+
+  <text x="55" y="548" fill="#8b949e" font-size="12">▸ Cross-node CSEND/CRECV (SQ-backed message relay between machines)</text>
+  <text x="55" y="568" fill="#8b949e" font-size="12">▸ Full NL→SIW compiler (English sentences → packed instruction streams)</text>
+  <text x="55" y="588" fill="#8b949e" font-size="12">▸ Phoenix DAG belief-space mutation (Metropolis sampling scheduler)</text>
+  <text x="55" y="608" fill="#8b949e" font-size="12">▸ AVX-512 SIMD backend (blocked: nightly Rust unavailable)</text>
+  <text x="55" y="628" fill="#8b949e" font-size="12">▸ Cooperative SMT benchmarking (target: 1.5-1.8× over single-thread)</text>
+  <text x="55" y="648" fill="#8b949e" font-size="12">▸ Zuna EEG bridge integration (Python↔Rust FFI for live neural data)</text>
+  <text x="55" y="668" fill="#8b949e" font-size="12">▸ Multi-node fleet orchestration (9 machines × 360 sentrons = 3240)</text>
+  <text x="55" y="688" fill="#8b949e" font-size="12">▸ Paper: "vTPU — Software-Defined Cognitive Acceleration on Commodity AMD"</text>
+
+  <!-- Footer -->
+  <text x="450" y="712" fill="#484f58" font-size="10" text-anchor="middle">💎 Theia · aletheia-core · R23W28 · 2026-02-23</text>
+</svg>
