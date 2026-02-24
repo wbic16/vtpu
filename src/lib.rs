@@ -132,3 +132,4 @@ pub mod repl;
 pub mod intent;
 pub mod trick;
 pub mod coop_smt;
+pub mod eggs;
