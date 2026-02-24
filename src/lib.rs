@@ -136,3 +136,5 @@ pub mod eggs;
 pub mod easter_island;
 pub mod orin;
 pub mod coop_fleet;
+pub mod twisted_pairs;
+pub mod belief;
