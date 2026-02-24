@@ -139,3 +139,7 @@ pub mod coop_fleet;
 pub mod twisted_pairs;
 pub mod belief;
 pub mod ubi;
+pub mod demon;
+pub use demon::{Demon, Placeable, Rejection, AdmitResult};
+pub mod ttsm;
+pub use ttsm::{TTSM, TemporalBlockId, TemporalBlock, SpeculativeState, TTSMError, TTSMResult, TTSMStats};
