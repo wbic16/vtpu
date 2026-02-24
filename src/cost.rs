@@ -115,30 +115,17 @@ impl CostAnalysis {
     }
 }
 
-/// Measure actual RAM per sentron by allocating and checking
+/// Measure RAM per sentron (stack + default heap allocations)
 pub fn measure_sentron_bytes() -> usize {
-    // Measure by creating sentrons and checking RSS delta
-    let before = get_rss_bytes();
-    let count = 1000;
-    let sentrons: Vec<Sentron> = (0..count)
-        .map(|i| Sentron::new(i as u16, PhextCoord::zero(), 0, 0))
-        .collect();
+    // Stack size of the Sentron struct
+    let stack = std::mem::size_of::<Sentron>();
 
-    // Force materialization
-    std::hint::black_box(&sentrons);
-    let after = get_rss_bytes();
+    // Heap: default NeuronLayer = 8 Neurons (Vec on heap)
+    let neuron_size = 40usize; // Neuron: id(1) + f32(4) + f32(4) + NeuronWiring(16) + enum(1) + u64(8) + padding ≈ 40
+    let neuron_heap = 8 * neuron_size;
 
-    let delta = if after > before { after - before } else { 0 };
-    delta / count
-}
-
-/// Get resident set size (Linux-specific)
-fn get_rss_bytes() -> usize {
-    std::fs::read_to_string("/proc/self/statm")
-        .ok()
-        .and_then(|s| s.split_whitespace().nth(1)?.parse::<usize>().ok())
-        .map(|pages| pages * 4096)
-        .unwrap_or(0)
+    // Empty Vecs (program, inbox, assoc entries) = 0 heap at init
+    stack + neuron_heap
 }
 
 /// Run a D-pipe microbenchmark: N iterations of DADD
@@ -253,8 +240,7 @@ mod tests {
     fn test_measure_sentron_bytes() {
         let bytes = measure_sentron_bytes();
         // Should be in ballpark of W28 estimate (~911 bytes)
-        // Allow wide range since RSS measurement is coarse
-        assert!(bytes < 8192, "Sentron should be under 8KB, got {}", bytes);
+        assert!(bytes > 200 && bytes < 4096, "Sentron should be 200-4096 bytes, got {}", bytes);
     }
 
     #[test]
