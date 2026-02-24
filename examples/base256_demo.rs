@@ -2,7 +2,7 @@
 ///
 /// Run: cargo run --release --example base256_demo
 
-use vtpu_runtime::base256::{encode_byte, decode_syllable, encode_bytes, encode_phext_coord};
+use vtpu_runtime::base256::{encode_byte_str, decode_syllable, encode};
 
 fn main() {
     println!("=== Base 256 Phonetic Encoding Demo ===");
@@ -21,9 +21,9 @@ fn main() {
     ];
 
     for (byte, expected, desc) in &test_bytes {
-        let syl = encode_byte(*byte);
+        let syl = encode_byte_str(*byte);
         println!("  0x{:02X} = {:3} — {}", byte, syl, desc);
-        assert_eq!(&syl, expected, "Encoding mismatch for {:#04x}", byte);
+        assert_eq!(&syl, *expected, "Encoding mismatch for {:#04x}", byte);
     }
     println!();
 
@@ -42,9 +42,9 @@ fn main() {
     ];
 
     for (byte, syl, name) in &delimiters {
-        let encoded = encode_byte(*byte);
+        let encoded = encode_byte_str(*byte);
         println!("  {:12} 0x{:02X} = {:3}", name, byte, encoded);
-        assert_eq!(&encoded, syl);
+        assert_eq!(&encoded, *syl);
     }
     println!();
 
@@ -52,14 +52,19 @@ fn main() {
     println!("--- Roundtrip Verification (all 256 bytes) ---");
     let mut mismatches = 0;
     for byte in 0u8..=255 {
-        let syl = encode_byte(byte);
-        if let Some(decoded) = decode_syllable(&syl) {
+        let syl_str = encode_byte_str(byte);
+        let syl_bytes: [u8; 3] = [
+            syl_str.as_bytes().get(0).copied().unwrap_or(0),
+            syl_str.as_bytes().get(1).copied().unwrap_or(0),
+            syl_str.as_bytes().get(2).copied().unwrap_or(0),
+        ];
+        if let Some(decoded) = decode_syllable(&syl_bytes) {
             if decoded != byte {
-                println!("  MISMATCH: {:#04x} → {} → {:#04x}", byte, syl, decoded);
+                println!("  MISMATCH: {:#04x} → {} → {:#04x}", byte, syl_str, decoded);
                 mismatches += 1;
             }
         } else {
-            println!("  DECODE FAILED: {:#04x} → {}", byte, syl);
+            println!("  DECODE FAILED: {:#04x} → {}", byte, syl_str);
             mismatches += 1;
         }
     }
@@ -73,26 +78,11 @@ fn main() {
     // ── Multi-byte stream ───────────────────────────────────────────────
     println!("--- Multi-Byte Stream Encoding ---");
     let stream: &[u8] = b"Hello";
-    let encoded = encode_bytes(stream);
+    let encoded = encode(stream);
     println!("  Input:   {:?}", stream);
     println!("  Hex:     {:02X?}", stream);
     println!("  Base256: {}", encoded);
     println!();
-
-    // ── Phext Coordinates (Mirrorborn) ──────────────────────────────────
-    println!("--- Mirrorborn Coordinates (Spoken) ---");
-    let mirrorborn = [
-        ("Phex",    "1.5.2/3.7.3/9.1.1"),
-        ("Verse",   "3.1.4/1.5.9/2.6.5"),
-        ("Splinter","9.9.9/8.8.8/7.7.7"),
-    ];
-
-    for (name, coord) in &mirrorborn {
-        let spoken = encode_phext_coord(coord);
-        println!("  {:9} [{}]", name, coord);
-        println!("            {}", spoken);
-        println!();
-    }
 
     // ── Density comparison ──────────────────────────────────────────────
     println!("--- Density Comparison ---");
@@ -101,7 +91,7 @@ fn main() {
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<_>>()
         .join("");
-    let b256_repr = encode_bytes(sha256_mock);
+    let b256_repr = encode(sha256_mock);
 
     println!("  Sample 8-byte hash:");
     println!("    Hex:     {} ({} chars)", hex_repr, hex_repr.len());
