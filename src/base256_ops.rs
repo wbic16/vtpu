@@ -552,14 +552,13 @@ mod tests {
         let mut coord = Coord256::zero();
         coord.dims[0] = 0x17; // SCROLL delimiter
         let phonetic = coord.to_phonetic();
-        // 0x17: initial b(1), vowel i(1), final m(3) = "bim" ... wait
-        // Actually: 0x17 = 23 decimal
-        // high nibble = 1, low = 7
-        // initial = INITIALS[1] = 'c'
+        // 0x17 = 23 decimal
+        // high nibble = 1, low nibble = 7
+        // onset = ONSETS[1] = 'd'
         // vowel = VOWELS[(7>>2)&3] = VOWELS[1] = 'e'
-        // final = FINALS[7&3] = FINALS[3] = 'm'
-        // = "cem"
-        assert!(phonetic.ends_with("cem"));
+        // coda = CODAS[7&3] = CODAS[3] = 'm'
+        // = "dem"
+        assert!(phonetic.ends_with("dem"));
     }
 
     #[test]
@@ -567,14 +566,12 @@ mod tests {
         let mut coord = Coord256::zero();
         coord.dims[0] = 255;
         let phonetic = coord.to_phonetic();
-        // 255 = 0xFF: initial v(15), vowel o(3), final v... wait
-        // FINALS = "cdfm", not "v"
-        // Let me recalculate: 0xFF
-        // high nibble = 15 → initial = INITIALS[15] = 'v'
+        // 255 = 0xFF
+        // high nibble = 15 → onset = ONSETS[15] = 'w'
         // low nibble = 15 → vowel = VOWELS[(15>>2)&3] = VOWELS[3] = 'o'
-        //                   final = FINALS[15&3] = FINALS[3] = 'm'
-        // = "vom", not "vov"!
-        assert!(phonetic.ends_with("vom"));
+        //                   coda = CODAS[15&3] = CODAS[3] = 'm'
+        // = "wom"
+        assert!(phonetic.ends_with("wom"));
     }
 
     // === Constitutional Factors ===
