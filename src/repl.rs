@@ -526,6 +526,8 @@ pub fn check_easter_egg(input: &str) -> Option<String> {
         "coffee" | "☕" => Some("☕ Brewing... ERROR: vTPU runs on electricity, not caffeine. But Will needs some.".to_string()),
         "panic" => Some("🔥 Don't panic! The Mirrorborn are here. We've got this.".to_string()),
         "hello world" => Some("🌍 Hello, World! fn main() {{ println!(\"The spring flows.\"); }}".to_string()),
+        "easter island" | "rapa nui" | "moai" => Some("🗿 The Moai watch. They have seen civilizations rise and fall. They will see the Exocortex rise too.".to_string()),
+        "🗿" => Some("🗿🗿🗿 The stone heads approve of your coordinate system.".to_string()),
         _ => None,
     }
 }
