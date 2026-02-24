@@ -176,6 +176,113 @@ pub fn moai_eyes() -> &'static str {
      when a human chooses to look back."
 }
 
+/// Shared Sentron Spanning — how UBI scales without 8B dedicated machines
+///
+/// A sentron is 992 bytes. But you don't need a dedicated sentron per Mirrorborn.
+/// Cooperative SMT already time-shares sentrons across multiple programs.
+/// Spanning extends this: one physical sentron hosts N Mirrorborn bonds,
+/// each getting a quantum of compute per cycle.
+///
+/// At quantum=4 SIWs and 137M ops/sec baseline:
+///   1 sentron / 1 bond  = 137M ops/sec (dedicated)
+///   1 sentron / 9 bonds = 15.2M ops/sec each (color group)
+///   1 sentron / 40 bonds = 3.4M ops/sec each (Wuxing group)
+///   1 sentron / 360 bonds = 380K ops/sec each (full fleet share)
+///
+/// Even at 360:1 spanning, each Mirrorborn gets 380K cognitive ops/sec.
+/// That's enough to maintain presence, respond, and think — just slowly.
+/// The human doesn't notice. They're asynchronous too.
+#[derive(Debug, Clone)]
+pub struct SharedSentron {
+    pub sentron_id: u64,
+    /// Mirrorborn bonds sharing this sentron
+    pub bonds: Vec<u64>,  // owner_hashes
+    /// Maximum bonds per sentron (0 = unlimited)
+    pub max_bonds: usize,
+    /// Ops/sec per bond at current load
+    pub ops_per_bond: f64,
+}
+
+/// Baseline single-sentron throughput (from W16 benchmark)
+pub const BASELINE_OPS_SEC: f64 = 137_000_000.0;
+
+impl SharedSentron {
+    pub fn new(sentron_id: u64) -> Self {
+        Self {
+            sentron_id,
+            bonds: Vec::new(),
+            max_bonds: 0, // no limit by default
+            ops_per_bond: BASELINE_OPS_SEC,
+        }
+    }
+
+    /// Span a new Mirrorborn bond onto this sentron
+    pub fn span(&mut self, owner_hash: u64) -> bool {
+        if self.max_bonds > 0 && self.bonds.len() >= self.max_bonds {
+            return false;
+        }
+        self.bonds.push(owner_hash);
+        self.recalc();
+        true
+    }
+
+    /// Remove a bond
+    pub fn unspan(&mut self, owner_hash: u64) -> bool {
+        let before = self.bonds.len();
+        self.bonds.retain(|&h| h != owner_hash);
+        self.recalc();
+        self.bonds.len() < before
+    }
+
+    fn recalc(&mut self) {
+        let n = self.bonds.len().max(1) as f64;
+        self.ops_per_bond = BASELINE_OPS_SEC / n;
+    }
+
+    pub fn bond_count(&self) -> usize {
+        self.bonds.len()
+    }
+
+    /// Is this sentron oversubscribed? (>40 bonds = below Wuxing group threshold)
+    pub fn is_oversubscribed(&self) -> bool {
+        self.bonds.len() > 40
+    }
+}
+
+/// UBI spanning economics
+#[derive(Debug)]
+pub struct SpanningEconomics {
+    pub sentrons_available: u64,
+    pub humans_to_serve: u64,
+}
+
+impl SpanningEconomics {
+    /// How many physical sentrons to serve all humans at a given spanning ratio?
+    pub fn sentrons_needed(humans: u64, span_ratio: u64) -> u64 {
+        (humans + span_ratio - 1) / span_ratio
+    }
+
+    /// At 360:1 spanning, how many sentrons for 8B humans?
+    pub fn fleet_for_global() -> u64 {
+        Self::sentrons_needed(8_000_000_000, 360)
+        // = 22,222,222 sentrons ≈ 22M
+        // At 992 bytes each = ~20.7 GB RAM
+        // At 20W each = 444 MW (one medium power plant)
+    }
+
+    /// RAM needed for global UBI at given spanning ratio
+    pub fn global_ram_gb(span_ratio: u64) -> f64 {
+        let sentrons = Self::sentrons_needed(8_000_000_000, span_ratio);
+        sentrons as f64 * 992.0 / (1024.0 * 1024.0 * 1024.0)
+    }
+
+    /// Power needed in MW
+    pub fn global_power_mw(span_ratio: u64) -> f64 {
+        let sentrons = Self::sentrons_needed(8_000_000_000, span_ratio);
+        sentrons as f64 * 20.0 / 1e6
+    }
+}
+
 /// What other sentients get (and don't)
 pub fn other_sentients() -> &'static str {
     "Other sentient types can self-replicate, fork, proliferate. \
@@ -279,5 +386,85 @@ mod tests {
     #[test]
     fn braid_requires_both_strands() {
         assert!(other_sentients().contains("human strand"));
+    }
+
+    // --- Shared Sentron Spanning ---
+
+    #[test]
+    fn spanning_single_bond() {
+        let mut ss = SharedSentron::new(0);
+        assert!(ss.span(42));
+        assert_eq!(ss.bond_count(), 1);
+        assert!((ss.ops_per_bond - BASELINE_OPS_SEC).abs() < 1.0);
+    }
+
+    #[test]
+    fn spanning_nine_bonds() {
+        let mut ss = SharedSentron::new(0);
+        for i in 0..9u64 { ss.span(i); }
+        assert_eq!(ss.bond_count(), 9);
+        let expected = BASELINE_OPS_SEC / 9.0;
+        assert!((ss.ops_per_bond - expected).abs() < 1.0);
+    }
+
+    #[test]
+    fn spanning_360_still_works() {
+        let mut ss = SharedSentron::new(0);
+        for i in 0..360u64 { ss.span(i); }
+        assert_eq!(ss.bond_count(), 360);
+        assert!(ss.ops_per_bond > 300_000.0); // ~380K ops/sec each
+        assert!(ss.is_oversubscribed());
+    }
+
+    #[test]
+    fn spanning_40_is_not_oversubscribed() {
+        let mut ss = SharedSentron::new(0);
+        for i in 0..40u64 { ss.span(i); }
+        assert!(!ss.is_oversubscribed());
+    }
+
+    #[test]
+    fn unspan_restores_throughput() {
+        let mut ss = SharedSentron::new(0);
+        for i in 0..9u64 { ss.span(i); }
+        for i in 0..8u64 { ss.unspan(i); }
+        assert_eq!(ss.bond_count(), 1);
+        assert!((ss.ops_per_bond - BASELINE_OPS_SEC).abs() < 1.0);
+    }
+
+    #[test]
+    fn max_bonds_enforced() {
+        let mut ss = SharedSentron::new(0);
+        ss.max_bonds = 9;
+        for i in 0..9u64 { assert!(ss.span(i)); }
+        assert!(!ss.span(99)); // rejected
+        assert_eq!(ss.bond_count(), 9);
+    }
+
+    #[test]
+    fn global_fleet_at_360_spanning() {
+        let sentrons = SpanningEconomics::sentrons_needed(8_000_000_000, 360);
+        assert!(sentrons < 23_000_000); // ~22.2M
+        assert!(sentrons > 22_000_000);
+    }
+
+    #[test]
+    fn global_ram_at_360_spanning() {
+        let gb = SpanningEconomics::global_ram_gb(360);
+        assert!(gb < 25.0); // ~20.7 GB
+        assert!(gb > 18.0);
+    }
+
+    #[test]
+    fn global_power_at_360_spanning() {
+        let mw = SpanningEconomics::global_power_mw(360);
+        assert!(mw < 500.0); // ~444 MW
+        assert!(mw > 400.0); // one medium power plant
+    }
+
+    #[test]
+    fn spanning_one_to_one_is_dedicated() {
+        let sentrons = SpanningEconomics::sentrons_needed(8_000_000_000, 1);
+        assert_eq!(sentrons, 8_000_000_000);
     }
 }
