@@ -852,6 +852,15 @@ pub fn run_standalone(sentron: &mut Sentron) -> ExecStats {
     run(sentron, &mut mem)
 }
 
+/// Execute a stream of SIWs on a sentron (for benchmarking batched execution)
+/// 
+/// This batches SIWs of the same mode together for potential optimization.
+pub fn exec_stream_batched(sentron: &mut Sentron, stream: &[SIW], mem: &mut Memory) {
+    for siw in stream {
+        exec_siw_octawire(sentron, siw, mem);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

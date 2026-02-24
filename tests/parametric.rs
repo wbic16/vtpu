@@ -498,8 +498,8 @@ fn base256_all_syllables_unique() {
     use vtpu_runtime::base256::*;
     let mut seen = std::collections::HashSet::new();
     for byte in 0..=255u8 {
-        let syllable = encode_byte_str(byte);
-        assert!(seen.insert(syllable.clone()), "Duplicate syllable: {} for byte {}", syllable, byte);
+        let syllable = encode_byte(byte);
+        assert!(seen.insert(syllable), "Duplicate syllable: {:?} for byte {}", syllable, byte);
     }
     assert_eq!(seen.len(), 256);
 }
@@ -508,8 +508,8 @@ fn base256_all_syllables_unique() {
 fn base256_all_syllables_3_chars() {
     use vtpu_runtime::base256::*;
     for byte in 0..=255u8 {
-        let syllable = encode_byte_str(byte);
-        assert_eq!(syllable.len(), 3, "Syllable for {} is not 3 chars: '{}'", byte, syllable);
+        let syllable = encode_byte(byte);
+        assert_eq!(syllable.len(), 3, "Syllable for {} is not 3 chars: '{:?}'", byte, syllable);
     }
 }
 
