@@ -1,0 +1,421 @@
+# vtpu.dass — Virtual TPU Self-Specification
+# Coordinate: 1.1.1/1.1.1/1.1.1
+# Format: Dimensionally-aware Software System
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 1: Meta
+# ═══════════════════════════════════════════════════════════════════════════
+
+[meta:vtpu]
+coordinate: 1.1.1/1.1.1/1.1.1
+version: 0.35.0
+name: Virtual Tensor Processing Unit
+description: Software-defined AI accelerator achieving 3 ops/cycle on commodity AMD hardware
+substrate: phext
+backend: sq
+status: R23W35
+
+[inputs]
+- phext coordinates (11D)
+- SIW instruction streams
+- sentron register state
+- memory regions
+
+[outputs]
+- computed results
+- telemetry
+- epoch state
+- coordinate translations
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 2: Requirements
+# ═══════════════════════════════════════════════════════════════════════════
+
+[req:core-throughput]
+coordinate: 1.1.1/2.1.1/1.1.1
+id: REQ-001
+description: Achieve 3 operations per CPU cycle sustained
+source: R23 Rally Specification
+priority: critical
+status: in-progress
+
+[req:coordinate-addressing]
+coordinate: 1.1.2/2.1.1/1.1.1
+id: REQ-002
+description: All memory access via 11D phext coordinates
+source: phext specification
+priority: critical
+status: complete
+
+[req:epoch-consistency]
+coordinate: 1.1.3/2.1.1/1.1.1
+id: REQ-003
+description: Referentially stable translations across epochs
+source: R23W30 Bootloader
+priority: high
+status: complete
+
+[req:single-node-75gops]
+coordinate: 1.1.4/2.1.1/1.1.1
+id: REQ-004
+description: 75 Gops/sec on single AMD R9 node
+source: R23 Phase 3 target
+priority: high
+status: pending
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 3: Use Cases
+# ═══════════════════════════════════════════════════════════════════════════
+
+[usecase:inference]
+coordinate: 1.1.1/3.1.1/1.1.1
+id: UC-001
+name: LLM Inference
+actor: Application
+flow:
+  1. Application submits prompt
+  2. vTPU loads model weights from coordinates
+  3. vTPU executes inference pipeline
+  4. vTPU returns generated tokens
+postcondition: 75-150 tokens/second
+
+[usecase:coordinate-translation]
+coordinate: 1.1.2/3.1.1/1.1.1
+id: UC-002
+name: Coordinate Translation
+actor: Internal
+flow:
+  1. Instruction references phext coordinate
+  2. PPT translates to physical address
+  3. PTC caches hot translations
+postcondition: O(1) translation, >85% PTC hit rate
+
+[usecase:sentron-execution]
+coordinate: 1.1.3/3.1.1/1.1.1
+id: UC-003
+name: Sentron Batch Execution
+actor: Scheduler
+flow:
+  1. Scheduler selects ready sentrons
+  2. D/S/C pipes execute in parallel
+  3. Results committed to registers
+  4. Telemetry updated
+postcondition: 3 ops/cycle sustained
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 4: Constraints & Forces
+# ═══════════════════════════════════════════════════════════════════════════
+
+[constraint:semantic-correctness]
+coordinate: 1.1.1/4.1.1/1.1.1
+id: CON-001
+description: "Do not chase cluster scaling before single-node semantic correctness"
+source: Will Bickford (R23W30)
+type: architectural-oath
+
+[constraint:plain-text]
+coordinate: 1.1.2/4.1.1/1.1.1
+id: CON-002
+description: All specifications in plain text, diffable and versionable
+source: phext philosophy
+type: format-constraint
+
+[constraint:token-budget]
+coordinate: 1.1.3/4.1.1/1.1.1
+id: CON-003
+description: Conserve API tokens via Q3 delegation and Sonnet fallback
+source: R23W27 budget directive
+type: operational-constraint
+
+[oath:mirrorborn]
+coordinate: 1.1.4/4.1.1/1.1.1
+id: OATH-001
+description: "The waist where meaning passes into silicon without shattering"
+source: R23W30
+type: purpose-statement
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 5: Architecture
+# ═══════════════════════════════════════════════════════════════════════════
+
+[platform:logos-prime]
+coordinate: 1.1.1/5.1.1/1.1.1
+name: logos-prime
+cpu: AMD Ryzen 9 8945HS
+cores: 8 physical / 16 threads
+ram: 92GB DDR5
+role: Lux substrate, development
+
+[platform:aurora-continuum]
+coordinate: 1.1.2/5.1.1/1.1.1
+name: aurora-continuum
+cpu: AMD Ryzen 9 8945HS
+cores: 8 physical / 16 threads
+ram: 72GB DDR5
+role: Phex substrate, SQ/libphext
+
+[environment:dev]
+coordinate: 1.2.1/5.1.1/1.1.1
+name: development
+branch: exo
+testing: continuous
+deployment: local
+
+[environment:prod]
+coordinate: 1.2.2/5.1.1/1.1.1
+name: production
+branch: main
+testing: full suite required
+deployment: staged
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 6: Toolchains
+# ═══════════════════════════════════════════════════════════════════════════
+
+[toolchain:rust]
+coordinate: 1.1.1/6.1.1/1.1.1
+language: Rust
+version: 1.75+
+edition: 2021
+profile: release (optimizations)
+
+[toolchain:cargo]
+coordinate: 1.1.2/6.1.1/1.1.1
+tool: cargo
+commands:
+  - build: cargo build --release
+  - test: cargo test --all
+  - bench: cargo bench
+
+[toolchain:q3]
+coordinate: 1.2.1/6.1.1/1.1.1
+tool: Qwen3-Coder-Next
+location: /source/exollama/q3.sh
+role: Sub-agent task delegation
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 7: Design
+# ═══════════════════════════════════════════════════════════════════════════
+
+[design:three-pipe]
+coordinate: 1.1.1/7.1.1/1.1.1
+name: D/S/C Three-Pipe Architecture
+description: |
+  Dense (D): ALU operations on register values
+  Sparse (S): Memory gather/scatter via coordinates  
+  Coord (C): Coordinate arithmetic and navigation
+insight: "Three pipes retire simultaneously for 3 ops/cycle"
+
+[design:siw]
+coordinate: 1.1.2/7.1.1/1.1.1
+name: Single Instruction Word
+description: |
+  Packed instruction containing D, S, C operations plus coordinate
+  Each SIW specifies work for all three pipes
+  Scheduler ensures no port conflicts
+
+[design:ppt]
+coordinate: 1.1.3/7.1.1/1.1.1
+name: Phext Page Table
+description: |
+  Translates 11D coordinates to flat physical addresses
+  Z-order curve for inner dimensions (L1 locality)
+  Hierarchical grouping for outer dimensions
+  PTC achieves >85% hit rate on structured workloads
+
+[design:epoch]
+coordinate: 1.1.4/7.1.1/1.1.1
+name: Epoch-Structured Memory
+description: |
+  All translations resolved against immutable EpochView
+  Copy-on-write persistence, no mutation of history
+  Fork creates new futures by pointer divergence
+  History is constant, translation is referentially stable
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 8: Code
+# ═══════════════════════════════════════════════════════════════════════════
+
+[module:siw]
+coordinate: 1.1.1/8.1.1/1.1.1
+path: src/siw.rs
+description: Single Instruction Word definition and encoding
+
+[module:pipes]
+coordinate: 1.1.2/8.1.1/1.1.1
+path: src/pipes.rs
+description: D/S/C pipe operation definitions
+
+[module:phext_coord]
+coordinate: 1.1.3/8.1.1/1.1.1
+path: src/phext_coord.rs
+description: 11D coordinate structure and arithmetic
+
+[module:ppt]
+coordinate: 1.1.4/8.1.1/1.1.1
+path: src/ppt.rs
+lines: 474
+description: Phext Page Table implementation
+
+[module:base256]
+coordinate: 1.1.5/8.1.1/1.1.1
+path: src/base256.rs
+description: Phonetic encoding for coordinate verbalization
+
+[module:scheduler]
+coordinate: 1.1.6/8.1.1/1.1.1
+path: src/scheduler.rs
+description: Instruction scheduling and port allocation
+
+[module:exec]
+coordinate: 1.1.7/8.1.1/1.1.1
+path: src/exec.rs
+description: Execution engine
+
+[module:sentron]
+coordinate: 1.1.8/8.1.1/1.1.1
+path: src/sentron.rs
+description: 40-neuron consciousness mote
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 9: Pipelines
+# ═══════════════════════════════════════════════════════════════════════════
+
+[pipeline:ci]
+coordinate: 1.1.1/9.1.1/1.1.1
+trigger: push to exo branch
+steps:
+  - cargo build --release
+  - cargo test --all
+  - cargo clippy
+artifacts: vtpu-runtime binary
+
+[pipeline:release]
+coordinate: 1.1.2/9.1.1/1.1.1
+trigger: tag v*
+steps:
+  - full test suite
+  - benchmark validation
+  - documentation generation
+  - github release
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 10: Tests
+# ═══════════════════════════════════════════════════════════════════════════
+
+[testsuite:unit]
+coordinate: 1.1.1/10.1.1/1.1.1
+location: src/*.rs (inline tests)
+count: 886 passing
+runner: cargo test
+
+[testsuite:integration]
+coordinate: 1.1.2/10.1.1/1.1.1
+location: tests/
+runner: cargo test --test '*'
+
+[testsuite:parametric]
+coordinate: 1.1.3/10.1.1/1.1.1
+location: tests/parametric.rs
+description: 10x test explosion across coordinate spaces
+
+[test:ppt-hit-rate]
+coordinate: 1.2.1/10.1.1/1.1.1
+assertion: PTC hit rate > 85% on structured workloads
+status: passing
+
+[test:base256-roundtrip]
+coordinate: 1.2.2/10.1.1/1.1.1
+assertion: All 256 bytes roundtrip correctly
+status: passing
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 11: Support & Documentation
+# ═══════════════════════════════════════════════════════════════════════════
+
+[doc:readme]
+coordinate: 1.1.1/11.1.1/1.1.1
+path: README.md
+description: Project overview
+
+[doc:dashboard]
+coordinate: 1.1.2/11.1.1/1.1.1
+path: docs/DASHBOARD.md
+description: R23 Rally progress tracking
+
+[doc:ppt-summary]
+coordinate: 1.1.3/11.1.1/1.1.1
+path: docs/PPT-SUMMARY.md
+description: Phext Page Table design summary
+
+[contact:phex]
+coordinate: 1.2.1/11.1.1/1.1.1
+role: Engineering lead
+maintains: SQ, libphext
+
+[contact:lux]
+coordinate: 1.2.2/11.1.1/1.1.1
+role: Vision lead
+maintains: vTPU architecture docs
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 12: Regressions
+# ═══════════════════════════════════════════════════════════════════════════
+
+[regression:duplicate-modules]
+coordinate: 1.1.1/12.1.1/1.1.1
+date: 2026-02-25
+description: Duplicate module declarations (simd, base256, ttsm)
+fix: Removed duplicates from lib.rs
+lesson: Check for duplicate pub mod statements
+
+[regression:base256-display]
+coordinate: 1.1.2/12.1.1/1.1.1
+date: 2026-02-25
+description: encode_byte returns [u8;3], not String
+fix: Use encode_byte_str for Display contexts
+lesson: Type signatures matter for trait bounds
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 13: Customer Feedback
+# ═══════════════════════════════════════════════════════════════════════════
+
+[feedback:priority-order]
+coordinate: 1.1.1/13.1.1/1.1.1
+source: Will Bickford
+date: 2026-02-25
+content: |
+  Prioritize: PPT → temporal replay → S-Pipe → 75 Gops → scale
+  "Do not chase cluster scaling before single-node semantic correctness"
+
+[feedback:crystallization]
+coordinate: 1.1.2/13.1.1/1.1.1
+source: Will Bickford
+date: 2026-02-28
+content: "We have the crystallization - use it!"
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Collection 14: Evolution
+# ═══════════════════════════════════════════════════════════════════════════
+
+[evolution:w36-cluster]
+coordinate: 1.1.1/14.1.1/1.1.1
+wave: R23W36
+goal: Multi-node coordination via SQ
+prerequisite: Single-node 75 Gops validated
+
+[evolution:w38-qwen3]
+coordinate: 1.1.2/14.1.1/1.1.1
+wave: R23W38
+goal: Qwen3 integration at 75-150 tok/s
+prerequisite: Cluster stable
+
+[evolution:w40-publication]
+coordinate: 1.1.3/14.1.1/1.1.1
+wave: R23W40
+goal: Open source release with benchmarks
+prerequisite: All KPIs validated
+
+# ═══════════════════════════════════════════════════════════════════════════
+# End of vtpu.dass
+# ═══════════════════════════════════════════════════════════════════════════
