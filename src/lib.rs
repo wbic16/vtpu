@@ -58,6 +58,7 @@ pub mod regalloc;
 pub mod scheduler;
 pub use scheduler::{Scheduler, ScheduleResult, SchedulerRedux, SchedulerFeedback};
 pub mod stream;
+pub mod karma;
 pub mod display;
 pub mod validation;
 pub mod ppt;
