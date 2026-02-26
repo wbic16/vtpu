@@ -151,3 +151,12 @@ pub use demon::{Demon, Placeable, Rejection, AdmitResult};
 pub use ttsm::{TTSM, TemporalBlockId, TemporalBlock, SpeculativeState, TTSMError, TTSMResult, TTSMStats};
 pub mod epoch_ppt;
 pub use epoch_ppt::{EpochPPT, EpochView, EpochId, EpochError, EpochResult, EpochPPTStats};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ālaya — Karma Seed Management (Component 10)
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit karma seeds directly. Storehouse consciousness for latent intents.
+// ─────────────────────────────────────────────────────────────────────────────
+
+pub mod alaya;
+pub use alaya::{Alaya, KarmaSeed, SeedId, RipeningCondition, TransformKind, SeedTransform, AlayaStats, SeedStateQuery};
