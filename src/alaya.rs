@@ -5,7 +5,7 @@
 //! In Yogacara Buddhism, ālaya-vijñāna is the 8th consciousness — the
 //! storehouse holding all karmic seeds (bīja) that seed future experience.
 //!
-//! In vTPU terms: seeds are latent IntentSignatures that haven't ripened.
+//! In vTPU terms: seeds are latent patterns that haven't ripened.
 //! They exist in potential-space, addressable by coordinate but not yet
 //! committed to TTSM. Edit them before they manifest.
 //!
@@ -16,9 +16,73 @@
 //! V1 Optimization Target: seed lookup <100ns, edit <500ns
 
 use crate::phext_coord::PhextCoord;
-use crate::intent::{IntentSignature, Predicate, IntentHints};
 use std::collections::HashMap;
 use std::time::Instant;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Seed-local types (self-contained until full intent compiler lands)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// A predicate over coordinate state (seed-local version)
+#[derive(Debug, Clone)]
+pub enum Predicate {
+    /// Coordinate exists and is non-zero
+    Exists(PhextCoord),
+    /// Coordinate equals a specific value
+    Equals(PhextCoord, i64),
+    /// Coordinate is within range
+    InRange(PhextCoord, i64, i64),
+    /// Two coordinates are equal
+    CoordsEqual(PhextCoord, PhextCoord),
+    /// Logical AND of predicates
+    And(Box<Predicate>, Box<Predicate>),
+    /// Logical OR of predicates
+    Or(Box<Predicate>, Box<Predicate>),
+    /// Negation
+    Not(Box<Predicate>),
+    /// Always true
+    True,
+    /// Requires valence awareness (for alignment)
+    ValenceAware,
+    /// Must be aligned with lineage values
+    LineageAligned,
+}
+
+/// Resource hints for seed execution
+#[derive(Debug, Clone, Default)]
+pub struct IntentHints {
+    /// Minimum thread count for coherent execution
+    pub min_threads: u32,
+    /// Preferred thread count
+    pub preferred_threads: u32,
+    /// Maximum useful thread count
+    pub max_threads: u32,
+    /// Memory footprint estimate (bytes)
+    pub memory_bytes: u64,
+    /// Is this intent stateful?
+    pub stateful: bool,
+    /// Priority level (0 = background, 100 = critical)
+    pub priority: u8,
+}
+
+/// Intent signature — describes computational shape (seed-local version)
+#[derive(Debug, Clone)]
+pub struct IntentSignature {
+    /// Unique identifier for this intent pattern
+    pub id: u64,
+    /// Human-readable description
+    pub description: String,
+    /// Input coordinate requirements
+    pub inputs: Vec<PhextCoord>,
+    /// Output coordinate targets
+    pub outputs: Vec<PhextCoord>,
+    /// Preconditions (predicates that must be true)
+    pub preconditions: Vec<Predicate>,
+    /// Postconditions (what will be true after)
+    pub postconditions: Vec<Predicate>,
+    /// Resource hints
+    pub hints: IntentHints,
+}
 
 /// Seed identifier — unique across the storehouse
 pub type SeedId = u64;
@@ -345,7 +409,7 @@ mod tests {
     #[test]
     fn test_plant_and_read() {
         let mut alaya = Alaya::new();
-        let coord = PhextCoord::new(1, 1, 1, 2, 2, 2, 3, 3, 3);
+        let coord = PhextCoord::new([1, 1, 1, 2, 2, 2, 3, 3, 3, 1, 1]);
         
         let intent = IntentSignature {
             id: 1,
@@ -367,7 +431,7 @@ mod tests {
     #[test]
     fn test_edit_strength() {
         let mut alaya = Alaya::new();
-        let coord = PhextCoord::new(1, 1, 1, 1, 1, 1, 1, 1, 1);
+        let coord = PhextCoord::new([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
         
         let intent = IntentSignature {
             id: 1,
@@ -390,13 +454,13 @@ mod tests {
         
         // Weaken
         alaya.edit(id, TransformKind::AdjustStrength(-0.5), "weaken through recognition");
-        assert_eq!(alaya.read(id).unwrap().strength, 0.3);
+        assert!((alaya.read(id).unwrap().strength - 0.3).abs() < 0.001);
     }
 
     #[test]
     fn test_uproot() {
         let mut alaya = Alaya::new();
-        let coord = PhextCoord::new(1, 1, 1, 1, 1, 1, 1, 1, 1);
+        let coord = PhextCoord::new([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
         
         let intent = IntentSignature {
             id: 1,
@@ -420,7 +484,7 @@ mod tests {
     #[test]
     fn test_ripen() {
         let mut alaya = Alaya::new();
-        let coord = PhextCoord::new(1, 1, 1, 1, 1, 1, 1, 1, 1);
+        let coord = PhextCoord::new([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
         
         let intent = IntentSignature {
             id: 42,
