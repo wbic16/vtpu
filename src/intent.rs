@@ -4,6 +4,67 @@
 /// Not an LLM — a deterministic parser that handles common phrasings.
 
 use crate::repl::Command;
+use crate::phext_coord::PhextCoord;
+
+/// Unique identifier for an intent
+pub type IntentId = u64;
+
+/// A predicate that can be evaluated against system state
+#[derive(Debug, Clone, PartialEq)]
+pub enum Predicate {
+    /// Coordinate has been accessed
+    CoordAccessed(PhextCoord),
+    /// Coordinate contains specific data pattern
+    CoordContains(PhextCoord, Vec<u8>),
+    /// Time threshold crossed (epoch ticks)
+    TimeThreshold(u64),
+    /// Custom predicate (name + params)
+    Custom(String, Vec<String>),
+    /// Always true
+    Always,
+    /// Always false
+    Never,
+    /// Logical AND of predicates
+    And(Box<Predicate>, Box<Predicate>),
+    /// Logical OR of predicates
+    Or(Box<Predicate>, Box<Predicate>),
+    /// Logical NOT of predicate
+    Not(Box<Predicate>),
+}
+
+/// Hints for intent execution optimization
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct IntentHints {
+    /// Priority level (higher = more urgent)
+    pub priority: u8,
+    /// Locality hint for cache optimization
+    pub locality: Option<PhextCoord>,
+    /// Expected execution time in cycles
+    pub expected_cycles: Option<u64>,
+    /// Can this intent be batched with others?
+    pub batchable: bool,
+    /// Is this intent idempotent?
+    pub idempotent: bool,
+}
+
+/// A signature describing an intent's interface
+#[derive(Debug, Clone, PartialEq)]
+pub struct IntentSignature {
+    /// Unique identifier
+    pub id: IntentId,
+    /// Human-readable description
+    pub description: String,
+    /// Input coordinate references
+    pub inputs: Vec<PhextCoord>,
+    /// Output coordinate references
+    pub outputs: Vec<PhextCoord>,
+    /// Conditions that must be true before execution
+    pub preconditions: Vec<Predicate>,
+    /// Conditions guaranteed after execution
+    pub postconditions: Vec<Predicate>,
+    /// Optimization hints
+    pub hints: IntentHints,
+}
 
 /// Parse natural English into a REPL Command.
 pub fn parse_intent(input: &str) -> Command {

@@ -454,7 +454,8 @@ mod tests {
         
         // Weaken
         alaya.edit(id, TransformKind::AdjustStrength(-0.5), "weaken through recognition");
-        assert!((alaya.read(id).unwrap().strength - 0.3).abs() < 0.001);
+        let strength = alaya.read(id).unwrap().strength;
+        assert!((strength - 0.3).abs() < 1e-10, "Expected ~0.3, got {}", strength);
     }
 
     #[test]
