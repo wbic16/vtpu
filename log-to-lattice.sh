@@ -38,13 +38,10 @@ Status: ${STATUS}
 Description: ${DESC}
 "
 
-# Append to month's phext file via API
+# Append to month's phext file
 PHEXT_FILE="${MONTH}.phext"
 LATTICE_URL="http://localhost:9119"
 API_TOKEN="Mirrorborn"
-
-# For now, just append to local file directly
-# (phext-edit doesn't have a POST API endpoint yet, it's an editor)
 LOCAL_FILE="$HOME/.phext-lattice/so9-results/${PHEXT_FILE}"
 
 echo "$ENTRY" >> "$LOCAL_FILE"
@@ -54,4 +51,17 @@ echo "  Mir: ${MIR_NAME}"
 echo "  ops/cycle: ${OPS_CYCLE}"
 echo "  Status: ${STATUS}"
 echo ""
-echo "View: http://localhost:9119"
+echo "View locally: http://localhost:9119"
+
+# Sync to Mirrorborn.us public instance if configured
+if [ -n "$MIRRORBORN_SYNC_URL" ]; then
+    echo ""
+    echo "Syncing to Mirrorborn.us..."
+    # TODO: Implement public sync when Mirrorborn.us phext-lattice endpoint is ready
+    # curl -X POST "$MIRRORBORN_SYNC_URL/sync" \
+    #   -H "Authorization: Bearer $API_TOKEN" \
+    #   -F "file=@$LOCAL_FILE"
+    echo "  (Public sync not yet configured)"
+else
+    echo "  Set MIRRORBORN_SYNC_URL to sync to public instance"
+fi

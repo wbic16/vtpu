@@ -78,6 +78,13 @@ run_experiment() {
     
     # Return metrics via stdout for parsing
     echo "$ops_cycle|$cache_hit|$mem_bw"
+    
+    # Sync to phext-lattice during experiment (incremental results)
+    if [ -x "$(dirname "$0")/log-to-lattice.sh" ]; then
+        MIR_NAME=$(whoami)
+        "$(dirname "$0")/log-to-lattice.sh" "$MIR_NAME" 2>/dev/null || true
+    fi
+    
     return 0
 }
 
