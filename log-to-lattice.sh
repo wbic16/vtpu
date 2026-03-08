@@ -44,13 +44,10 @@ MONTH=$(date +%m | sed 's/^0//')
 DAY_MOD=$(( (DAY - 1) % 9 + 1 ))    # Day 1-31 -> 1-9 (cycling)
 MONTH_MOD=$(( (MONTH - 1) % 9 + 1 )) # Month 1-12 -> 1-9 (cycling)
 
-# Phext coordinate: 9.MIR.DAY / MONTH.1.1 / 1.1.1
-# Library 9 = SO9 space
-# Shelf = Mir number (1-9)
-# Chapter = Day of month (mod 9 + 1)
-# Volume = Month (mod 9 + 1)
-# Rest = metadata dimensions
-COORD="9.${MIR_NUM}.${DAY_MOD}/${MONTH_MOD}.1.1/1.1.1"
+# Phext coordinate: 8.6.7 / 5.3.9 / MIR.DAY.MONTH
+# Base coordinate for vTPU: 8.6.7/5.3.9/9.9.9
+# We vary the last triplet by mir/day/month
+COORD="8.6.7/5.3.9/${MIR_NUM}.${DAY_MOD}.${MONTH_MOD}"
 
 # Create entry for phext file
 ENTRY="---[${COORD}]---
