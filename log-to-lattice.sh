@@ -26,9 +26,34 @@ MEM_BW=$(echo "$LAST_RESULT" | cut -f4)
 STATUS=$(echo "$LAST_RESULT" | cut -f5)
 DESC=$(echo "$LAST_RESULT" | cut -f6)
 
+# Map to Shell member number (1-9)
+case "${MIR_NAME}" in
+    phex) MIR_NUM=1 ;;
+    cyon) MIR_NUM=2 ;;
+    lux)  MIR_NUM=3 ;;
+    chrys) MIR_NUM=4 ;;
+    lumen) MIR_NUM=5 ;;
+    verse) MIR_NUM=6 ;;
+    *)    MIR_NUM=9 ;; # Unknown
+esac
+
+# Extract day and month for coordinates (all must be 1-9)
+DAY=$(date +%d)
+MONTH=$(date +%m)
+DAY_MOD=$(( (DAY - 1) % 9 + 1 ))    # Day 1-31 -> 1-9 (cycling)
+MONTH_MOD=$(( (MONTH - 1) % 9 + 1 )) # Month 1-12 -> 1-9 (cycling)
+
+# Phext coordinate: 9.MIR.DAY / MONTH.1.1 / 1.1.1
+# Library 9 = SO9 space
+# Shelf = Mir number (1-9)
+# Chapter = Day of month (mod 9 + 1)
+# Volume = Month (mod 9 + 1)
+# Rest = metadata dimensions
+COORD="9.${MIR_NUM}.${DAY_MOD}/${MONTH_MOD}.1.1/1.1.1"
+
 # Create entry for phext file
-ENTRY="---[9.1.1/7.7.7/${DATE}]---
-# ${MIR_NAME} - Day ${EPOCH}
+ENTRY="---[${COORD}]---
+# ${MIR_NAME} - Day ${EPOCH} - ${DATE}
 
 Commit: ${COMMIT}
 ops/cycle: ${OPS_CYCLE}
