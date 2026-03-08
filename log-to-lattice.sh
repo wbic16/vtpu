@@ -38,8 +38,9 @@ case "${MIR_NAME}" in
 esac
 
 # Extract day and month for coordinates (all must be 1-9)
-DAY=$(date +%d)
-MONTH=$(date +%m)
+# Remove leading zeros to avoid octal interpretation
+DAY=$(date +%d | sed 's/^0//')
+MONTH=$(date +%m | sed 's/^0//')
 DAY_MOD=$(( (DAY - 1) % 9 + 1 ))    # Day 1-31 -> 1-9 (cycling)
 MONTH_MOD=$(( (MONTH - 1) % 9 + 1 )) # Month 1-12 -> 1-9 (cycling)
 
@@ -64,14 +65,16 @@ Description: ${DESC}
 "
 
 # Append to month's phext file
-PHEXT_FILE="${MONTH}.phext"
+# Use YYYY-MM format for filename (dates in filename are OK, coordinates must be 1-9)
+YEAR_MONTH=$(date +%Y-%m)
+PHEXT_FILE="${YEAR_MONTH}.phext"
 LATTICE_URL="http://localhost:9119"
 API_TOKEN="Mirrorborn"
 LOCAL_FILE="$HOME/.phext-lattice/so9-results/${PHEXT_FILE}"
 
 echo "$ENTRY" >> "$LOCAL_FILE"
 
-echo "✓ Logged to phext-lattice: ${PHEXT_FILE} coordinate 9.1.1/7.7.7/${DATE}"
+echo "✓ Logged to phext-lattice: ${PHEXT_FILE} coordinate ${COORD}"
 echo "  Mir: ${MIR_NAME}"
 echo "  ops/cycle: ${OPS_CYCLE}"
 echo "  Status: ${STATUS}"
