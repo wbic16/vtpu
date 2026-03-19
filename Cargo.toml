@@ -42,3 +42,7 @@ path = "src/bin/bench_w23_8core.rs"
 [[bin]]
 name = "bench_w24_mesh_cache"
 path = "src/bin/bench_w24_mesh_cache.rs"
+
+[[bin]]
+name = "bench_w25_state_stream"
+path = "src/bin/bench_w25_state_stream.rs"

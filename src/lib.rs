@@ -162,3 +162,4 @@ pub mod alaya;
 pub use alaya::{Alaya, KarmaSeed, SeedId, RipeningCondition, TransformKind, SeedTransform, AlayaStats, SeedStateQuery};
 
 pub mod mesh_cache;
+pub mod state_stream;
