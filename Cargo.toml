@@ -34,3 +34,7 @@ codegen-units = 1
 
 [profile.bench]
 inherits = "release"
+
+[[bin]]
+name = "bench_w23_8core"
+path = "src/bin/bench_w23_8core.rs"
