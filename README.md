@@ -11,8 +11,8 @@ A software-defined accelerator with sentron-native instruction scheduling and ph
 | A — Foundation | W1–W5 | ✅ Complete |
 | 0 — Single Core | W6–W12 | ✅ **GATE PASSED** (2.93 ops/cycle avg) |
 | 1 — SMT | W13–W18 | ✅ **GATE PASSED** (2.84x total) |
-| 2 — Memory Hierarchy | W19–W24 | 🔓 In progress |
-| 3 — Interactivity | W25–W32 | ⬜ |
+| 2 — Memory Hierarchy | W19–W24 | ✅ **GATE PASSED** (3.0 ops/cycle, cache hierarchy, flux live) |
+| 3 — Interactivity | W25–W32 | 🔓 **W25 active** (cache crosstalk, concurrent coordination) |
 | 4 — Compiler | W33–W37 | ⬜ |
 | 5 — Launch | W38–W40 | ⬜ |
 
