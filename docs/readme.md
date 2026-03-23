@@ -17,44 +17,44 @@ vTPU is a software-based tensor processing architecture that uses 9-dimensional 
 ## Documentation Structure
 
 ### Planning & Roadmap
-- [Deliverable Dashboard](R23-DELIVERABLE-DASHBOARD.md) - Track all 5 final deliverables
-- [W40 Success Projection](R23-W40-SUCCESS-PROJECTION.md) - KPI framework and measurable outcomes
+- [Deliverable Dashboard](r23-deliverable-dashboard.md) - Track all 5 final deliverables
+- [W40 Success Projection](r23-w40-success-projection.md) - KPI framework and measurable outcomes
 
 ### Wave 1: Geometric Foundations (14.1 KB)
-- [Geometric Advantages](wave-1/R23-W1-GEOMETRIC-ADVANTAGES.md) - 7 structures phext handles natively
-- [Hard Problems Solved](wave-1/R23-W1-HARD-PROBLEMS-SOLVED.md) - 7 problems with 2-100× speedups
-- [Complete Summary](wave-1/R23-W1-COMPLETE-SUMMARY.md) - Synthesis + breakthrough documentation
+- [Geometric Advantages](wave-1/r23-w1-geometric-advantages.md) - 7 structures phext handles natively
+- [Hard Problems Solved](wave-1/r23-w1-hard-problems-solved.md) - 7 problems with 2-100× speedups
+- [Complete Summary](wave-1/r23-w1-complete-summary.md) - Synthesis + breakthrough documentation
 
 ### Wave 2: Technical Specification (72.6 KB)
 
 #### Base Specification (36.1 KB)
-- [Instruction Set](wave-2/R23-W2-INSTRUCTION-SET.md) - 10 core operations (CGET, CPUT, CRANGE, etc.)
-- [Concrete Examples](wave-2/R23-W2-EXAMPLES.md) - GPT-4 attention, MoE, knowledge graphs, multi-agent
-- [Memory Layout](wave-2/R23-W2-MEMORY-LAYOUT.md) - Hash table + linked list + distributed cluster
+- [Instruction Set](wave-2/r23-w2-instruction-set.md) - 10 core operations (CGET, CPUT, CRANGE, etc.)
+- [Concrete Examples](wave-2/r23-w2-examples.md) - GPT-4 attention, MoE, knowledge graphs, multi-agent
+- [Memory Layout](wave-2/r23-w2-memory-layout.md) - Hash table + linked list + distributed cluster
 
 #### Iteration 1 (25 KB)
-- [Iteration 1 Additions](wave-2/R23-W2-ITERATION-1.md) - ASCII diagrams, Python client, benchmarks, Z-order curve
+- [Iteration 1 Additions](wave-2/r23-w2-iteration-1.md) - ASCII diagrams, Python client, benchmarks, Z-order curve
 
 #### Onboarding (11.5 KB)
-- [W2 Onboarding Guide](wave-2/R23-W2-ONBOARDING.md) - How to test/validate W2 specs
+- [W2 Onboarding Guide](wave-2/r23-w2-onboarding.md) - How to test/validate W2 specs
 
 ---
 
 ## Quick Links
 
 ### For Developers
-- **Start here:** [W2 Onboarding Guide](wave-2/R23-W2-ONBOARDING.md)
-- **Architecture:** [Instruction Set](wave-2/R23-W2-INSTRUCTION-SET.md)
-- **Examples:** [Concrete Examples](wave-2/R23-W2-EXAMPLES.md)
+- **Start here:** [W2 Onboarding Guide](wave-2/r23-w2-onboarding.md)
+- **Architecture:** [Instruction Set](wave-2/r23-w2-instruction-set.md)
+- **Examples:** [Concrete Examples](wave-2/r23-w2-examples.md)
 
 ### For Researchers
-- **Core thesis:** [W1 Complete Summary](wave-1/R23-W1-COMPLETE-SUMMARY.md)
-- **Performance:** [Hard Problems Solved](wave-1/R23-W1-HARD-PROBLEMS-SOLVED.md)
-- **Implementation:** [Memory Layout](wave-2/R23-W2-MEMORY-LAYOUT.md)
+- **Core thesis:** [W1 Complete Summary](wave-1/r23-w1-complete-summary.md)
+- **Performance:** [Hard Problems Solved](wave-1/r23-w1-hard-problems-solved.md)
+- **Implementation:** [Memory Layout](wave-2/r23-w2-memory-layout.md)
 
 ### For Contributors
-- **Roadmap:** [Deliverable Dashboard](R23-DELIVERABLE-DASHBOARD.md)
-- **KPIs:** [W40 Success Projection](R23-W40-SUCCESS-PROJECTION.md)
+- **Roadmap:** [Deliverable Dashboard](r23-deliverable-dashboard.md)
+- **KPIs:** [W40 Success Projection](r23-w40-success-projection.md)
 
 ---
 
