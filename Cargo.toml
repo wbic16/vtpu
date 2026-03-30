@@ -46,3 +46,7 @@ path = "src/bin/bench_w24_mesh_cache.rs"
 [[bin]]
 name = "bench_w25_state_stream"
 path = "src/bin/bench_w25_state_stream.rs"
+
+[[bin]]
+name = "bench_freq_router"
+path = "src/bin/bench_freq_router.rs"
