@@ -36,6 +36,12 @@ The integration commit's source tree was produced by conflict-free local merges 
 
 **Build-cache footnote:** An initial incremental test run after rapid consecutive local merges reported 18 missing TTSM APIs, despite those APIs being present in the source tree. Recompiling into a fresh `CARGO_TARGET_DIR` resolved the stale crate metadata; the clean-target all-targets suite passed. Future integration runs should use clean target directories when compiler metadata and source disagree.
 
+### Portable CI follow-up (2026-10-31)
+
+- Added `.github/workflows/reality-gate-integration.yml` on the integration branch to run on branch pushes and manual dispatch. It checks the Rust 1.99.1 portable all-targets suite and four focused release regression targets with `RUSTFLAGS=''`.
+- Independently reran both exact test commands locally with the explicit empty `RUSTFLAGS` override and a fresh target directory: **both succeeded**, including all **22** focused release regression tests.
+- The workflow file is published, but a successful GitHub-hosted Actions run has **not** yet been verified. GitHub Actions availability and any branch protection requirement remain an open check.
+
 ## Outstanding release gates
 
 - [ ] Freeze canonical semantics for `DRED`, HDC operations, and reserved ternary encodings. PR #2's oracle deliberately characterizes some current behavior provisionally.
