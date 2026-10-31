@@ -37,12 +37,24 @@ fn flags_do_not_overwrite_dimension_ten() {
 }
 
 #[test]
+fn canonical_raw_coordinate_encoding_is_stable() {
+    // One explicit 121-bit dimension payload plus seven nonzero flag bits.
+    // In particular dim10=1024 uses hi bit 56, next to the hi[57..63] flags.
+    let dims = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1024];
+    let mut coord = PhextCoord::new(dims);
+    coord.set_flags(0x55);
+    assert_eq!(coord.as_raw(), (0x0300_5008_00c0_1001, 0xab00_0050_0901_001c));
+    assert_eq!(coord.dims(), dims);
+    assert_eq!(coord.flags(), 0x55);
+}
+
+#[test]
 fn sampled_11bit_domain_translation_is_injective() {
     let mut ppt = PhextPageTable::new();
     let mut seen = HashMap::<usize, [u16; 11]>::new();
     let mut seed = 0x19a7_52d1_93e4_66c9u64;
 
-    for _ in 0..20_000 {
+    for sample_index in 0..20_000 {
         let mut dims = [0u16; 11];
         for dim in &mut dims {
             seed ^= seed << 13;
@@ -54,6 +66,28 @@ fn sampled_11bit_domain_translation_is_injective() {
         let address = ppt.translate(&coord);
         if let Some(prior) = seen.insert(address, dims) {
             assert_eq!(prior, dims, "distinct 11-bit coordinates alias at address {address}");
+        }
+
+        // Random coordinates alone almost never collide under the *old*
+        // lossy 7/8-bit projection. Exercise every omitted high-bit class
+        // deliberately so this test fails on unfixed exo, not just by luck.
+        if sample_index % 128 == 0 {
+            for axis in 0..11 {
+                let mut contrasted = dims;
+                contrasted[axis] ^= if axis < 3 { 1 << 7 } else { 1 << 8 };
+                let changed = PhextCoord::new(contrasted);
+                let other_address = ppt.translate(&changed);
+                assert_ne!(
+                    address, other_address,
+                    "coordinate axis {axis} high-bit alias at address {address}"
+                );
+                if let Some(prior) = seen.insert(other_address, contrasted) {
+                    assert_eq!(
+                        prior, contrasted,
+                        "distinct 11-bit coordinates alias at address {other_address}"
+                    );
+                }
+            }
         }
     }
 }
