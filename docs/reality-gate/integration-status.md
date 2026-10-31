@@ -55,3 +55,12 @@ The integration commit's source tree was produced by conflict-free local merges 
 ## Hourly continuation rule
 
 Fetch current `exo`, integration, and PR heads; integrate only new commits by a non-forced, expected-head update; run a fresh all-targets suite and focused release tests; publish exact results and newly discovered regressions. If any gate fails, isolate a bounded fix on a reviewable PR. **Do not merge integration into `exo` or declare a release without Will's explicit approval.**
+
+### Review-fix integration (2026-10-31; PR #4)
+
+- Previous integration head: `31cc69de131c32c208976f434828422b68e052d4`; `exo` advanced to `6cc627012ecf588b9550193427250b2590ff040d` from merged PR #3.
+- PR #4 advanced from `cd01737c46479f13441492308ef21fc5786582c4` to `5d6d1802b1328ff7dae10a4c279b5ce4c43debad`; the follow-up adds adversarial high-bit pairs, canonical raw-bit encoding regression, and a legacy migration/region-count note.
+- Confirmed integration and current `exo` have byte-identical blobs for PR #3's `src/regalloc.rs` and `tests/rg1b_csend_hazards.rs`; no source conflict requiring a rewrite/rebase.
+- This new merge checkpoint preserves PR #4 and `exo` commit ancestry as additional parents and updates exactly two PR #4 files in the integrated tree (plus this dated status entry).
+- **Tests:** No local cargo/rustc available in the execution environment. Previous GitHub-hosted portable CI success on `31cc69de131c32c208976f434828422b68e052d4` does **not** validate this commit. Require a fresh hosted Actions run on the actual updated integration SHA before calling integration green.
+- Ship status remains **NOT READY**; no `exo` mutation, no PR base retargeting, no performance claims.
