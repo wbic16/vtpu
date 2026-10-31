@@ -122,7 +122,10 @@ pub fn extract_accesses(siw: &SIW) -> RegAccess {
             acc.reads.push((RegClass::Message, *msg_reg));
         }
         CoordOp::CSEND { msg_reg, .. } => {
-            acc.reads.push((RegClass::Message, *msg_reg));
+            // Both executors source CSEND from the General register file,
+            // using msg_reg % 16. Mirror that exact access here or the
+            // packer/scheduler can miss D→C RAW and C→D WAR hazards.
+            acc.reads.push((RegClass::General, *msg_reg % 16));
         }
         CoordOp::CRECV { rd, .. } => {
             acc.writes.push((RegClass::General, *rd));
