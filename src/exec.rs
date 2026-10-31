@@ -103,8 +103,8 @@ fn ternary_apply(activation: i64, trits: u64) -> i64 {
     for i in 0..32 {
         let trit = (trits >> (i * 2)) & 0x3;
         match trit {
-            0b01 => result += activation,  // +1
-            0b10 => result -= activation,  // -1
+            0b01 => result = result.wrapping_add(activation),  // +1, defined on i64 overflow
+            0b10 => result = result.wrapping_sub(activation),  // -1, defined on i64 overflow
             _ => {}                         // 0 or unused
         }
     }
@@ -481,10 +481,16 @@ fn exec_d_arithmetic(sentron: &mut Sentron, siw: &SIW) -> u8 {
             r[rd as usize] = r[rs1 as usize].wrapping_mul(r[rs2 as usize]);
         }
         DenseOp::DCMP { rd, rs1, rs2 } => {
-            r[rd as usize] = (r[rs1 as usize] - r[rs2 as usize]).signum();
+            // Comparison must not subtract: MIN - MAX overflows in debug builds.
+            r[rd as usize] = match r[rs1 as usize].cmp(&r[rs2 as usize]) {
+                std::cmp::Ordering::Less => -1,
+                std::cmp::Ordering::Equal => 0,
+                std::cmp::Ordering::Greater => 1,
+            };
         }
         DenseOp::DSEL { rd, rs1, rs2, flags } => {
-            r[rd as usize] = if flags != 0 { r[rs1 as usize] } else { r[rs2 as usize] };
+            // flags names a register, not a condition literal.
+            r[rd as usize] = if r[flags as usize] != 0 { r[rs1 as usize] } else { r[rs2 as usize] };
         }
         DenseOp::DMOV { rd, imm } => {
             r[rd as usize] = imm;
