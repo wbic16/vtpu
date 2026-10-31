@@ -4,20 +4,25 @@
 //!
 //! The TTSM manages state trajectories with immutable history:
 //! - RAM = present-moment state (speculative, mutable)
-//! - SSD = immutable past (committed, replayable, forkable)
+//! - `TTSM::new()` = in-memory immutable committed snapshots
+//! - `TTSM::open(path)` = append-only durable snapshots with checksums/sync
 //!
 //! Every state transition targets a temporal block address, not a memory address.
 //! Mutability is time-addressed intent.
 //!
 //! Key operations:
-//! - commit(): RAM → SSD (state becomes immutable history)
+//! - commit(): speculative RAM → immutable committed history (disk if opened)
 //! - fork(): create a branch in the timeline
-//! - replay(): traverse committed history
+//! - replay(): traverse metadata; replay_payloads(): obtain committed bytes
 //! - rollback(): abandon speculative state, return to last commit
 
 use crate::PhextCoord;
 use std::collections::HashMap;
+use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+#[path = "ttsm_log.rs"]
+mod log;
 
 /// Temporal block identifier — a point in state trajectory space
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -110,6 +115,12 @@ pub enum TTSMError {
     NothingToCommit,
     /// State size exceeds limit
     StateTooLarge { size: usize, limit: usize },
+    /// An owner tried to commit against a head that has already advanced.
+    Conflict { expected: TemporalBlockId, actual: TemporalBlockId },
+    /// Filesystem operation failed while accessing a durable snapshot log.
+    Storage { message: String },
+    /// The versioned log failed its integrity or lineage checks.
+    CorruptLog { message: String },
 }
 
 impl std::fmt::Display for TTSMError {
@@ -130,6 +141,11 @@ impl std::fmt::Display for TTSMError {
             TTSMError::StateTooLarge { size, limit } => {
                 write!(f, "State size {} exceeds limit {}", size, limit)
             }
+            TTSMError::Conflict { expected, actual } => {
+                write!(f, "Temporal head conflict: expected {:?}, actual {:?}", expected, actual)
+            }
+            TTSMError::Storage { message } => write!(f, "TTSM storage error: {message}"),
+            TTSMError::CorruptLog { message } => write!(f, "TTSM corrupt snapshot log: {message}"),
         }
     }
 }
@@ -146,6 +162,10 @@ pub struct TTSM {
     heads: HashMap<u64, TemporalBlockId>,
     /// Speculative states (RAM, not yet committed)
     speculative: HashMap<String, SpeculativeState>, // keyed by owner
+    /// Committed full state bytes, independent of mutable speculative buffers.
+    payloads: HashMap<TemporalBlockId, Vec<u8>>,
+    /// Optional append-only disk log; new() remains an in-memory mode.
+    snapshot_log: Option<log::SnapshotLog>,
     /// Next fork ID to allocate
     next_fork_id: u64,
     /// Maximum state size (for commit)
@@ -169,6 +189,8 @@ impl TTSM {
             blocks: HashMap::new(),
             heads: HashMap::new(),
             speculative: HashMap::new(),
+            payloads: HashMap::new(),
+            snapshot_log: None,
             next_fork_id: 1,
             max_state_size: Self::DEFAULT_MAX_STATE,
             total_committed_bytes: 0,
@@ -187,8 +209,76 @@ impl TTSM {
         
         ttsm.blocks.insert(genesis.id, genesis);
         ttsm.heads.insert(0, TemporalBlockId::genesis());
+        ttsm.payloads.insert(TemporalBlockId::genesis(), Vec::new());
         
         ttsm
+    }
+
+    /// Open or initialize an append-only, checksummed snapshot log.
+    ///
+    /// A successful commit or fork has synced its record to disk. Recovery
+    /// reconstructs heads from complete records and discards a torn *tail*;
+    /// checksum errors in complete records are returned, never ignored.
+    /// `new()` deliberately remains an in-memory-only alternative.
+    pub fn open(path: impl AsRef<Path>) -> TTSMResult<Self> {
+        let (store, events) = log::SnapshotLog::open(path.as_ref())?;
+        let mut ttsm = Self::new();
+        for event in events {
+            ttsm.apply_recovered_event(event)?;
+        }
+        ttsm.snapshot_log = Some(store);
+        Ok(ttsm)
+    }
+
+    fn apply_recovered_event(&mut self, event: log::LogEvent) -> TTSMResult<()> {
+        match event {
+            log::LogEvent::Commit { block, payload } => {
+                let parent = block.parent.ok_or_else(|| TTSMError::CorruptLog {
+                    message: "commit without parent".to_string(),
+                })?;
+                if !self.blocks.contains_key(&parent)
+                    || self.heads.get(&parent.fork_id).copied() != Some(parent)
+                    || block.id.fork_id != parent.fork_id
+                    || Some(block.id.sequence) != parent.sequence.checked_add(1)
+                    || self.blocks.contains_key(&block.id)
+                    || block.state_size != payload.len()
+                    || block.state_hash != simple_hash(&payload)
+                {
+                    return Err(TTSMError::CorruptLog {
+                        message: format!("invalid committed lineage at {:?}", block.id),
+                    });
+                }
+                self.total_committed_bytes += payload.len();
+                self.heads.insert(block.id.fork_id, block.id);
+                self.payloads.insert(block.id, payload);
+                self.blocks.insert(block.id, block);
+            }
+            log::LogEvent::Fork { source_head, fork_head } => {
+                if self.heads.get(&source_head.fork_id).copied() != Some(source_head)
+                    || self.heads.contains_key(&fork_head.fork_id)
+                    || self.blocks.contains_key(&fork_head)
+                    || fork_head.sequence != source_head.sequence
+                {
+                    return Err(TTSMError::CorruptLog {
+                        message: format!("invalid fork lineage at {:?}", fork_head),
+                    });
+                }
+                let source = self.blocks.get(&source_head).ok_or_else(|| TTSMError::CorruptLog {
+                    message: format!("fork source block absent: {:?}", source_head),
+                })?.clone();
+                let mut fork_block = source;
+                fork_block.id = fork_head;
+                fork_block.label = format!("fork from {}", source_head.fork_id);
+                let payload = self.payloads.get(&source_head).cloned().ok_or_else(|| TTSMError::CorruptLog {
+                    message: format!("fork source payload absent: {:?}", source_head),
+                })?;
+                self.payloads.insert(fork_head, payload);
+                self.blocks.insert(fork_head, fork_block);
+                self.heads.insert(fork_head.fork_id, fork_head);
+                self.next_fork_id = self.next_fork_id.max(fork_head.fork_id.saturating_add(1));
+            }
+        }
+        Ok(())
     }
     
     /// Set maximum state size for commits
@@ -210,6 +300,23 @@ impl TTSM {
                 dirty: false,
             }
         })
+    }
+
+    /// Begin a speculative branch against a particular fork's current head.
+    pub fn begin_on_fork(&mut self, owner: &str, fork_id: u64, coord: PhextCoord)
+        -> TTSMResult<&mut SpeculativeState>
+    {
+        let base = self.heads.get(&fork_id).copied().ok_or(TTSMError::BlockNotFound {
+            id: TemporalBlockId { sequence: 0, fork_id, timestamp_ns: 0 },
+        })?;
+        if let Some(existing) = self.speculative.get(owner) {
+            if existing.base.fork_id != fork_id {
+                return Err(TTSMError::Conflict { expected: base, actual: existing.base });
+            }
+        }
+        Ok(self.speculative.entry(owner.to_string()).or_insert_with(|| SpeculativeState {
+            base, data: Vec::new(), coord, owner: owner.to_string(), dirty: false,
+        }))
     }
     
     /// Get current speculative state for an owner
@@ -245,14 +352,22 @@ impl TTSM {
     
     /// Commit speculative state to immutable history
     pub fn commit(&mut self, owner: &str, label: &str) -> TTSMResult<TemporalBlockId> {
-        let state = self.speculative.remove(owner)
+        let state = self.speculative.get(owner).cloned()
             .ok_or(TTSMError::NothingToCommit)?;
         
         if !state.dirty && state.data.is_empty() {
             return Err(TTSMError::NothingToCommit);
         }
+        if state.data.len() > self.max_state_size {
+            return Err(TTSMError::StateTooLarge { size: state.data.len(), limit: self.max_state_size });
+        }
         
         let parent_id = state.base;
+        let actual_head = self.heads.get(&parent_id.fork_id).copied()
+            .ok_or(TTSMError::BlockNotFound { id: parent_id })?;
+        if actual_head != parent_id {
+            return Err(TTSMError::Conflict { expected: parent_id, actual: actual_head });
+        }
         let new_id = parent_id.next();
         
         let block = TemporalBlock {
@@ -265,7 +380,12 @@ impl TTSM {
             label: label.to_string(),
         };
         
+        if let Some(store) = self.snapshot_log.as_mut() {
+            store.append(&log::LogEvent::Commit { block: block.clone(), payload: state.data.clone() })?;
+        }
+        self.speculative.remove(owner);
         self.total_committed_bytes += state.data.len();
+        self.payloads.insert(new_id, state.data);
         self.blocks.insert(new_id, block);
         self.heads.insert(new_id.fork_id, new_id);
         
@@ -281,26 +401,14 @@ impl TTSM {
             })?;
         
         let new_fork_id = self.next_fork_id;
-        self.next_fork_id += 1;
         
         // New fork starts at the same point as base
         let fork_head = base_head.fork(new_fork_id);
         
-        // Copy the block to the new fork
-        if let Some(base_block) = self.blocks.get(&base_head).cloned() {
-            let fork_block = TemporalBlock {
-                id: fork_head,
-                parent: base_block.parent,
-                state_coord: base_block.state_coord,
-                state_hash: base_block.state_hash,
-                state_size: base_block.state_size,
-                owner: base_block.owner,
-                label: format!("fork from {}", base_fork),
-            };
-            self.blocks.insert(fork_head, fork_block);
+        if let Some(store) = self.snapshot_log.as_mut() {
+            store.append(&log::LogEvent::Fork { source_head: base_head, fork_head })?;
         }
-        
-        self.heads.insert(new_fork_id, fork_head);
+        self.apply_recovered_event(log::LogEvent::Fork { source_head: base_head, fork_head })?;
         
         Ok(new_fork_id)
     }
@@ -308,6 +416,25 @@ impl TTSM {
     /// Get a committed block
     pub fn block(&self, id: &TemporalBlockId) -> Option<&TemporalBlock> {
         self.blocks.get(id)
+    }
+
+    /// Immutable bytes of an individual committed snapshot (including fork roots).
+    pub fn committed_payload(&self, id: &TemporalBlockId) -> Option<&[u8]> {
+        self.payloads.get(id).map(Vec::as_slice)
+    }
+
+    /// Replay state *bytes*, not just block metadata, from genesis to head.
+    pub fn replay_payloads(&self, fork_id: u64) -> TTSMResult<Vec<(&TemporalBlock, &[u8])>> {
+        if !self.heads.contains_key(&fork_id) {
+            return Err(TTSMError::BlockNotFound {
+                id: TemporalBlockId { sequence: 0, fork_id, timestamp_ns: 0 },
+            });
+        }
+        self.replay(fork_id).into_iter().map(|block| {
+            self.committed_payload(&block.id)
+                .map(|bytes| (block, bytes))
+                .ok_or(TTSMError::BlockNotFound { id: block.id })
+        }).collect()
     }
     
     /// Get the head of a fork
