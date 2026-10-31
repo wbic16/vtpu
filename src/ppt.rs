@@ -14,10 +14,29 @@
 use crate::phext_coord::PhextCoord;
 use std::collections::HashMap;
 
-/// Z-order lookup table for 3D → 1D interleaving (7-bit per dimension)
+/// Z-order lookup table for 3D → 1D interleaving (low 7 bits per dimension)
 /// Pre-computed for O(1) coordinate translation
 struct ZOrderLUT {
     tables: [[u32; 128]; 3], // One table per inner dimension
+}
+
+/// Lossless 100-bit region key: outer dimensions 3..10 are each 11 bits,
+/// followed by the high 4 bits of inner dimensions 0..2. The remaining
+/// 7 bits of each inner dimension are interleaved into a 21-bit Z offset.
+///
+/// Splitting the 33-bit inner index into 12 region bits plus a 21-bit offset
+/// keeps each region at 16 MiB rather than requiring a 64 GiB region while
+/// preserving exact translation for every legal 11-bit coordinate value.
+#[inline]
+pub(crate) fn page_region_key(dims: &[u16; 11]) -> u128 {
+    let mut key = 0u128;
+    for (i, &dim) in dims[3..].iter().enumerate() {
+        key |= (dim as u128) << (i * 11);
+    }
+    for (i, &dim) in dims[..3].iter().enumerate() {
+        key |= ((dim as u128) >> 7) << (88 + i * 4);
+    }
+    key
 }
 
 impl ZOrderLUT {
@@ -157,8 +176,8 @@ pub enum MemoryTier {
 pub struct PhextPageTable {
     z_lut: ZOrderLUT,
     ptc: PTC,
-    /// Allocated regions: maps outer-dimension group key to base address
-    regions: HashMap<u64, usize>,
+    /// Allocated regions: full outer dimensions plus high inner-dimension bits
+    regions: HashMap<u128, usize>,
     /// Total allocated bytes
     allocated: usize,
     /// Slab size for inner-dimension pages (Z-order mapped)
@@ -188,6 +207,9 @@ impl PhextPageTable {
 
     /// Create with custom PTC sets and inner page size
     pub fn with_config(ptc_sets: usize, inner_page_size: usize) -> Self {
+        assert!(ptc_sets > 0, "PTC must have at least one set");
+        assert!(inner_page_size >= 1 << 21,
+            "Page size must hold all 2^21 low-bit Z-order entries");
         PhextPageTable {
             z_lut: ZOrderLUT::new(),
             ptc: PTC::new(ptc_sets),
@@ -219,8 +241,8 @@ impl PhextPageTable {
     fn compute_address(&mut self, coord: &PhextCoord) -> usize {
         let dims = coord.dims();
 
-        // Outer dimensions (3-10) form the region key
-        let region_key = self.outer_key(&dims);
+        // Full outer dimensions and high inner bits form a lossless region key.
+        let region_key = page_region_key(&dims);
 
         // Get or allocate region base
         let base = *self.regions.entry(region_key).or_insert_with(|| {
@@ -233,20 +255,6 @@ impl PhextPageTable {
         let z_offset = self.z_lut.encode(dims[0], dims[1], dims[2]) as usize;
 
         base + z_offset * std::mem::size_of::<f64>()
-    }
-
-    /// Compute outer-dimension region key from dims 3-10
-    /// Adjacent outer coordinates get nearby keys for L2/L3 locality
-    #[inline]
-    fn outer_key(&self, dims: &[u16; 11]) -> u64 {
-        // Pack dims 3-10 into 64 bits (8 dims × 8 bits each = 64 bits)
-        // We truncate to 8 bits per dim (256 positions) for the region key.
-        // Full precision is in the PTC entry.
-        let mut key = 0u64;
-        for i in 3..11 {
-            key |= ((dims[i] as u64) & 0xFF) << ((i - 3) * 8);
-        }
-        key
     }
 
     /// Classify which memory tier a coordinate targets

@@ -16,10 +16,11 @@ use std::fmt;
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(C, align(16))]
 pub struct PhextCoord {
-    /// Lower 64 bits: dimensions 0-5 (6 × 11 bits = 66 bits used)
+    /// Lower 64 bits: dimensions 0-4 and low 9 bits of dimension 5
     lo: u64,
     
-    /// Upper 64 bits: dimensions 6-10 + flags (5 × 11 bits + 7 flags = 62 bits used)
+    /// Upper 64 bits: high 2 bits of dimension 5, dimensions 6-10,
+    /// and flags in bits 57-63 (the entire remaining 7 bits)
     hi: u64,
 }
 
@@ -150,16 +151,20 @@ impl PhextCoord {
         (self.lo, self.hi)
     }
 
-    /// Get flags (7 bits in upper portion)
+    /// Get flags (the 7 unused high bits after 121 coordinate bits).
     pub fn flags(&self) -> u8 {
-        ((self.hi >> 55) & 0x7F) as u8
+        ((self.hi >> 57) & 0x7F) as u8
     }
     
     /// Set flags (7 bits)
     pub fn set_flags(&mut self, flags: u8) {
         assert!(flags < 128, "Flags must fit in 7 bits");
-        let mask = !(0x7Fu64 << 55);
-        self.hi = (self.hi & mask) | ((flags as u64) << 55);
+        // Dimension 10 occupies hi[46..56]. The previous shift (55)
+        // overlapped its two high bits and could silently corrupt addresses.
+        // Raw coordinate bytes written by the old layout need migration if
+        // they contained nonzero flags; this fixes the canonical 128-bit pack.
+        let mask = !(0x7Fu64 << 57);
+        self.hi = (self.hi & mask) | ((flags as u64) << 57);
     }
     
     /// Manhattan distance to another coordinate
