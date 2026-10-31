@@ -1,0 +1,38 @@
+name: Reality Gate integration
+
+on:
+  push:
+    branches:
+      - codex/reality-gate-integration
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reality-gate-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  portable-tests:
+    name: Rust 1.99.1 portable tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.99.1 --profile minimal
+      - name: All targets (portable CPU flags)
+        env:
+          RUSTFLAGS: ""
+        run: cargo +1.99.1 test --all-targets --locked --quiet
+      - name: Focused Reality Gate release regressions
+        env:
+          RUSTFLAGS: ""
+        run: >-
+          cargo +1.99.1 test --release --locked
+          --test reality_gate_rg1a
+          --test reality_gate_coord
+          --test reality_gate_ttsm_durable
+          --test rg1b_csend_hazards
+          --quiet
