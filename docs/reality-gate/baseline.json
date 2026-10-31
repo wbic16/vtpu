@@ -1,0 +1,81 @@
+{
+  "schema": "vtpu-reality-gate/baseline-v0",
+  "capture_date": "2026-10-31",
+  "source_revision": "26b1c7982068fec1fc2329f17567ab6dc64ee171",
+  "patch_branch": "codex/rg0a-benchmark-truth-20261031",
+  "runtime_dependencies_added": 0,
+  "rust_toolchain": "1.99.1",
+  "build_mode": "repository configuration: target-cpu=native",
+  "hardware_provenance": "Codex sandbox advertises AMD EPYC 9V74, 9 visible vCPUs, Linux 6.18.57; not an approved 8945HS RG-4 host; actual CPU cycles and power not measured",
+  "before": {
+    "command": "cargo test --all-targets --quiet",
+    "aggregate": {
+      "passed": 3910,
+      "failed": 0,
+      "ignored": 3,
+      "target_suites": 87
+    },
+    "counting_method": "sum of test result lines across Cargo target suites; some test executions may be repeated",
+    "static_test_attributes": {
+      "src": 922,
+      "tests": 1470,
+      "counting_method": "literal #[test] source occurrences, not runtime test results"
+    }
+  },
+  "after": {
+    "command": "cargo test --all-targets --quiet",
+    "aggregate": {
+      "passed": 3916,
+      "failed": 0,
+      "ignored": 3,
+      "target_suites": 87
+    },
+    "counting_method": "sum across Cargo test target suites; includes 4 new W29 and 2 new cost tests",
+    "targeted": [
+      { "command": "cargo test --bin bench_w29 --quiet", "passed": 4, "failed": 0 },
+      { "command": "cargo test --lib cost::tests --quiet", "passed": 10, "failed": 0 }
+    ]
+  },
+  "unapproved_smoke_run": {
+    "command": "cargo run --release --bin bench_w29",
+    "samples": 1,
+    "status": "diagnostic only, not RG-4 or hardware-IPC evidence",
+    "clock_cycles": null,
+    "power_watts": null,
+    "observations": [
+      { "workload": "single_DADD", "useful_ops": 100000, "wall_ns_per_op": 46.9 },
+      { "workload": "single_SGATHER", "useful_ops": 100000, "wall_ns_per_op": 52.7 },
+      { "workload": "CNOP_control", "useful_ops": 0, "retired_nop_siws": 100000, "wall_ms": 7.43732 },
+      { "workload": "40_sentron_one_process", "useful_ops": 400000, "wall_ns_per_op": 41.6 },
+      { "workload": "200_sentron_one_process", "useful_ops": 400000, "wall_ns_per_op": 39.6 }
+    ]
+  },
+  "claims": [
+    {
+      "source": "src/bin/bench_w29.rs",
+      "prior_classification": "invalid",
+      "finding": "Dormant sentrons caused zero SIW retirement",
+      "patch_scope": "spawn/rearm every run; count observed retirement and assert architectural effects",
+      "performance_claim": "not established"
+    },
+    {
+      "source": "src/cost.rs::bench_d_pipe",
+      "prior_classification": "invalid",
+      "finding": "Timed clone/assignment loop never executed DADD",
+      "patch_scope": "execute actual DADD using reused program; count observed retirement",
+      "performance_claim": "not established"
+    },
+    {
+      "source": "src/bin/bench_w23_8core.rs",
+      "classification": "modeled",
+      "finding": "5 GHz assumed clock and cooperative single-thread execution",
+      "performance_claim": "not established"
+    },
+    {
+      "source": "src/ttsm.rs",
+      "classification": "metadata_only",
+      "finding": "Committed state payloads are not crash-recoverable",
+      "durability_claim": "not established"
+    }
+  ]
+}
