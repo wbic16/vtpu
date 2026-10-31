@@ -5,7 +5,7 @@
 **Date:** 2026-10-31  
 **Status:** Proposed; no implementation or performance claims are made by this document  
 **Target:** `wbic16/vtpu`, base branch `exo`  
-**Related review:** Intended for comparison with independent plans from Grok and Emise
+**Related reviews:** Grok's GitHub comment and separate Emise/Argon attachments; see [review addendum](reality-gate-review-addendum-2026-10-31.md) for provenance and corrections. Standalone reviewer plans have not been supplied.
 
 ## Executive decision
 
@@ -33,14 +33,17 @@ gate or an achieved result. A failure to hit that goal is valid evidence.
 
 This proposal is based on source inspection, **not** a local build, test run,
 profiling session, or hardware audit. Revalidate every observation at the
-working branch head before editing the associated code.
+working branch head before editing the associated code. The subsequent review
+found a material error in the original W29 assessment; the corrected row below
+and the [review addendum](reality-gate-review-addendum-2026-10-31.md) supersede
+that earlier claim without changing implementation code.
 
 | Area | Evidence in `exo` | Hypothesis or limitation to test |
 | --- | --- | --- |
 | Performance accounting | `src/bin/bench_w23_8core.rs` computes `total_retired / (wall_seconds * 5e9)` and describes sentron pairs as a model of SMT siblings | This is an effective rate using an assumed frequency, not a measured hardware IPC or proof of physical 8-core parallelism |
-| Unified benchmark | `src/bin/bench_w29.rs` executes real interpreter paths but includes a C-pipe NOP baseline and a 200-sentron loop on one host | Define operation semantics and physical execution scope explicitly before interpreting GOPS |
+| Unified benchmark — **invalid pending repair** | `src/bin/bench_w29.rs` assigns programs to `Dormant` sentrons without calling `spawn`; `exec::run()` immediately returns unless `Running`. Its timed loops therefore retire **zero SIWs** at this revision. Separately, `src/cost.rs::bench_d_pipe` times program cloning/assignment without invoking execution. | Quarantine W29 and cost-benchmark throughput claims; repair lifecycle, require nonzero retirement and architectural effects, and rerun before interpreting GOPS. |
 | Temporal state | `src/ttsm.rs` stores `TemporalBlock` metadata in a `HashMap` and reconstructs a metadata lineage on replay | Reopen/replay of state bytes, crash consistency, and divergent-writer handling need proof |
-| Epoch mapping | `src/epoch_ppt.rs` has immutable `EpochView` snapshots and epoch-tagged PTC entries | Cross-epoch referential stability and no-allocation-on-replay should be tested adversarially |
+| Epoch mapping | `src/epoch_ppt.rs` has immutable `EpochView` snapshots and epoch-tagged PTC entries, but its page-table translation truncates 11-bit coordinate dimensions to 7/8 bits; `PhextCoord::set_flags` overlaps dim10 | Address injectivity, flag integrity, cross-epoch stability, and no-allocation-on-replay must be tested adversarially |
 | Validation | `src/validation.rs` explicitly uses simplified dependency tracking without specific register provenance | Construct differential tests for RAW/WAR/WAW and all three pipes |
 | Documentation | `readme.md`, `onboarding.md`, `vtpu.dass`, and historical wave notes report different counts/statuses | Generate current facts from executable artifacts; label historical targets clearly |
 | Intent | `src/intent.rs` has deterministic parsing and `IntentSignature` types | Distinguish implemented parsing from compiler/code-generation promises |
@@ -97,9 +100,14 @@ Tasks:
 2. Run a representative baseline including SIW interpreter, D/S/C pipeline,
    PPT, TTSM, SMT/cooperative scheduling, and at least one mixed workload.
 3. Classify statements in current documentation as **measured**, **modeled**,
-   **historical**, **target**, or **unverified**. Never silently turn one into
-   another.
+   **historical**, **target**, **unverified**, or **invalid**. Explicitly
+   quarantine W29 and `cost::bench_d_pipe` results until execution is repaired.
+   Never silently turn one classification into another.
 4. Produce a machine-readable benchmark manifest and a concise human report.
+5. Record the installed Rust toolchain and `target-cpu=native` configuration,
+   resolve `Cargo.lock`/toolchain pinning, and reconcile literal `#[test]`
+   counts (922 under `src/`, 1,470 under `tests/` at the reviewed commit)
+   separately from the number of compiled and passing tests.
 
 Deliverables: `docs/reality-gate/baseline.md` and an exportable
 `baseline.json` sample; a proposed correction list for stale README/DASS
@@ -127,6 +135,12 @@ Tasks:
    state plus faults; minimize and save counterexamples.
 4. Add model-based tests for structural validation and coordinate translation.
    Include seeded fuzz replays as normal regression tests.
+5. Implement an initial **RG-1A D-pipe slice** covering all 16 active D-pipe
+   opcodes with explicit semantics and a truly independent oracle. Exercise
+   10,000 seeded streams, boundary values, per-opcode coverage, comparator
+   mutation tests, and the observed `DSEL`/`DCMP` divergences. Keep the
+   100,000 mixed-pipe streams as the full RG-1 exit criterion. Test `CSEND`
+   register hazards and PPT coordinate aliasing as separate prerequisite gates.
 
 Deliverables: `tests/reality_gate/` (or an idiomatic equivalent), seed corpus,
 state comparator, and a fail-fast report specifying which execution path
@@ -147,11 +161,13 @@ Tasks:
 1. Specify a minimal committed-block serialization with version, coordinate,
    epoch, parent/fork identity, payload length, checksum, and integrity check.
    Define storage limits and error behavior before implementation.
-2. Add a small append-only persistence layer or SQ adapter behind a trait.
-   Preserve zero external dependencies for the core. No real user data in tests.
+2. Begin with an **append-only snapshot log with per-block checksums**;
+   keep SQ as an optional adapter behind a storage trait, not a requirement
+   for local tests. Preserve zero external dependencies for the core. No real
+   user data in tests.
 3. Implement replay of **state bytes**, not only metadata, with verification of
-   hashes and parent linkage. State clearly whether payloads are snapshots or
-   deltas and make the contract testable.
+   hashes and parent linkage. The first durable format stores full snapshots;
+   delta compression is a separately justified optimization.
 4. Define and test concurrent-owner semantics: either optimistic head checks
    and explicit conflict errors, or an equally explicit merge/branch policy.
 5. Inject failures before/after append, flush, manifest/head update, and reopen.
@@ -183,8 +199,10 @@ Tasks:
 3. Evaluate JIT only after the AOT baseline establishes correctness and a
    speedup opportunity. Any executable-memory path requires a security and
    memory-safety review.
-4. Keep compiler/toolchain experiments outside the zero-dependency runtime.
-   A lightweight codegen option is welcome; importing LLVM is not assumed.
+4. Keep compiler/toolchain experiments outside the zero-dependency runtime:
+   **no new runtime crates**. A lightweight codegen option is welcome;
+   importing LLVM is not assumed. Require byte-identical native output for
+   the same canonical SIW stream and build configuration.
 
 Deliverables: a minimal source-to-native lowering prototype, deterministic
 equivalence tests, compile-time and runtime cost measurements, and a documented
@@ -202,8 +220,11 @@ to the larger cluster only after the single-node experiment is credible.
 
 Tasks:
 
-1. Pin benchmark threads explicitly and record logical CPU → physical core/
-   SMT mapping. Separate 1-thread, 1-core/2-thread, 8-core, and 16-thread runs.
+1. Obtain maintainer approval for one specifically named 8945HS host before
+   testing (Grok suggested `elven-path`, not yet confirmed as the test host).
+   Pin threads explicitly and record logical CPU → physical core/SMT mapping,
+   `perf_event_paranoid`, and counter access. Separate 1-thread,
+   1-core/2-thread, 8-core, and 16-thread runs.
 2. Capture wall-clock throughput, actual CPU cycles/instructions (when PMU
    access is available), cache misses, memory traffic, energy/power when
    measurable, and thermal/frequency behavior. Do not require root to run a
@@ -249,6 +270,11 @@ measured physical CPU cycles, and wall time. The arithmetic target
 `8 cores × 5 GHz × 2 ops/cycle ≈ 80 Gops/s` is an optimistic model with
 perfect sustained clocks and useful-work occupancy, **not a benchmark**.
 
+**Useful operation:** A completed non-NOP architectural D-, S-, or C-pipe
+operation whose defined state transition or externally observable effect is
+executed and counted once; program setup, dormant returns, and simulated
+cycles are not useful operations.
+
 ## Execution order, gates, and contribution policy
 
 | Sequence | Depends on | Merge gate | Proposed token allowance |
@@ -266,9 +292,12 @@ not by token expenditure alone.
 
 **PR boundaries:**
 
-1. Proposal/documentation (this PR; no runtime behavior change).
-2. Baseline harness, claims ledger, and structured results.
-3. Reference model, differential generators, and counterexample corpus.
+1. Proposal/documentation and attributed review addendum (this PR; no runtime
+   behavior change).
+2. RG-0A: pinned baseline, claims ledger, benchmark retirement checks/fixes,
+   and structured results.
+3. RG-1A: independent all-D-opcode reference model, 10K seeded streams,
+   differential generators, and counterexample corpus.
 4. Durable TTSM/epoch work with recovery tests.
 5. Native-lowering prototype with equivalence and benchmarks.
 6. Single-node results and optional independently approved cluster plan.
@@ -304,9 +333,10 @@ files across plans without an agreed owner.
    or both behind a trait; benchmark and failure semantics should stay common.
 3. Confirm the first AMD host available for RG-4; record access restrictions
    separately from the test plan.
-4. Compare this submission with Grok's and Emise's plans by evidence quality,
-   novelty, dependencies, and executable exit gates. Merge compatible work,
-   retaining provenance for distinct proposals.
+4. Compare this submission with Grok's, Emise's, and Argon's **supplied
+   reviews** by evidence quality, novelty, dependencies, and executable exit
+   gates. Do not attribute standalone plans that have not been provided.
+   Merge compatible work, retaining provenance for distinct proposals.
 
 **Definition of success:** A skeptical engineer can clone a specific commit,
 run a finite set of tests and benchmarks, reproduce the reported results, and
