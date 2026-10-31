@@ -20,7 +20,7 @@
 //!  Meaning survives reboot."
 
 use crate::PhextCoord;
-use crate::ppt::{PhextPageTable, PPTStats, MemoryTier};
+use crate::ppt::page_region_key;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -30,8 +30,8 @@ pub type EpochId = u64;
 /// Immutable region mapping snapshot
 #[derive(Clone, Debug)]
 pub struct RegionSnapshot {
-    /// Region key → base address (frozen at commit)
-    mappings: HashMap<u64, usize>,
+    /// Lossless 100-bit page-region key → base address (frozen at commit)
+    mappings: HashMap<u128, usize>,
     /// Total allocated bytes in this snapshot
     allocated: usize,
 }
@@ -44,7 +44,7 @@ impl RegionSnapshot {
         }
     }
     
-    fn from_mappings(mappings: HashMap<u64, usize>, allocated: usize) -> Self {
+    fn from_mappings(mappings: HashMap<u128, usize>, allocated: usize) -> Self {
         Self { mappings, allocated }
     }
 }
@@ -62,12 +62,12 @@ pub struct EpochView {
 
 impl EpochView {
     /// Lookup a region in this epoch's frozen view
-    pub fn lookup_region(&self, key: u64) -> Option<usize> {
+    pub fn lookup_region(&self, key: u128) -> Option<usize> {
         self.regions.mappings.get(&key).copied()
     }
     
     /// Check if a region exists
-    pub fn has_region(&self, key: u64) -> bool {
+    pub fn has_region(&self, key: u128) -> bool {
         self.regions.mappings.contains_key(&key)
     }
 }
@@ -182,7 +182,7 @@ pub enum EpochError {
     /// Attempted allocation during replay (read-only epoch)
     AllocationDuringReplay { epoch_id: EpochId, coord: String },
     /// Region not found in sealed epoch
-    RegionNotFound { epoch_id: EpochId, region_key: u64 },
+    RegionNotFound { epoch_id: EpochId, region_key: u128 },
     /// Epoch not found in history
     EpochNotFound { epoch_id: EpochId },
     /// Attempted mutation of sealed epoch
@@ -221,11 +221,11 @@ pub struct EpochPPT {
     active_epoch: EpochId,
     /// Sealed epoch views (immutable history)
     history: HashMap<EpochId, EpochView>,
-    /// Working region mappings for active epoch
-    working_regions: HashMap<u64, usize>,
+    /// Working region mappings for active epoch, including high inner bits
+    working_regions: HashMap<u128, usize>,
     /// Working allocation counter
     working_allocated: usize,
-    /// Inner page size
+    /// Inner page size (2^21 Z-order entries per region)
     inner_page_size: usize,
     /// Epoch-aware translation cache
     ptc: EpochPTC,
@@ -279,15 +279,6 @@ impl EpochPPT {
             | self.z_tables[2][(d2 & 0x7F) as usize]
     }
     
-    #[inline]
-    fn outer_key(dims: &[u16; 11]) -> u64 {
-        let mut key = 0u64;
-        for i in 3..11 {
-            key |= ((dims[i] as u64) & 0xFF) << ((i - 3) * 8);
-        }
-        key
-    }
-    
     /// Get current active epoch
     pub fn active_epoch(&self) -> EpochId {
         self.active_epoch
@@ -326,7 +317,7 @@ impl EpochPPT {
             .ok_or(EpochError::EpochNotFound { epoch_id })?;
         
         let dims = coord.dims();
-        let region_key = Self::outer_key(&dims);
+        let region_key = page_region_key(&dims);
         
         // Region must exist — no allocation during replay
         let base = view.lookup_region(region_key)
@@ -343,7 +334,7 @@ impl EpochPPT {
     /// Compute address in active epoch (may allocate)
     fn compute_address_active(&mut self, coord: &PhextCoord) -> EpochResult<usize> {
         let dims = coord.dims();
-        let region_key = Self::outer_key(&dims);
+        let region_key = page_region_key(&dims);
         
         // Get or allocate region
         let base = *self.working_regions.entry(region_key).or_insert_with(|| {
