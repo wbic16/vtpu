@@ -71,25 +71,35 @@ pub struct Fleet {
 impl Fleet {
     /// Create a fleet of given size with default wiring
     pub fn new(size: usize) -> Self {
+        // Sentron IDs and NeuronWiring endpoints are u16. A fleet may use all
+        // 65,536 distinct IDs, but larger fleets would silently alias IDs.
+        assert!(size <= u16::MAX as usize + 1,
+                "fleet size exceeds the u16 sentron ID address space");
+
         let sentrons: Vec<Sentron> = (0..size).map(|i| {
             Sentron::new(i as u16, PhextCoord::zero(), 0, 0)
         }).collect();
 
-        // Default wiring: ring topology (each sentron wired to ±1, ±2)
+        // Default wiring: ring topology (4 upstream + 4 downstream).
+        // For small fleets, multiple links necessarily name the same sentron.
         let wiring: Vec<NeuronWiring> = (0..size).map(|i| {
             let mut w = NeuronWiring::new();
-            let n = size as u16;
+            // Compute in usize and reduce the step before subtraction. The
+            // former `i as u16 + n - 4` underflowed for fleets of 1..=3 and
+            // truncated a 65,536-sentron fleet's modulus to zero.
+            let upstream = |step: usize| ((i + size - step % size) % size) as u16;
+            let downstream = |step: usize| ((i + step) % size) as u16;
             w.upstream = [
-                ((i as u16 + n - 1) % n),
-                ((i as u16 + n - 2) % n),
-                ((i as u16 + n - 3) % n),
-                ((i as u16 + n - 4) % n),
+                upstream(1),
+                upstream(2),
+                upstream(3),
+                upstream(4),
             ];
             w.downstream = [
-                ((i as u16 + 1) % n),
-                ((i as u16 + 2) % n),
-                ((i as u16 + 3) % n),
-                ((i as u16 + 4) % n),
+                downstream(1),
+                downstream(2),
+                downstream(3),
+                downstream(4),
             ];
             w
         }).collect();
@@ -335,6 +345,58 @@ mod tests {
         assert_eq!(w.downstream[0], 1);
         assert_eq!(w.downstream[1], 2);
         assert_eq!(w.upstream[0], 9);
+    }
+
+    #[test]
+    fn small_ring_wiring_one_sentron() {
+        assert_small_ring_wiring(1);
+    }
+
+    #[test]
+    fn small_ring_wiring_two_sentrons() {
+        assert_small_ring_wiring(2);
+    }
+
+    #[test]
+    fn small_ring_wiring_three_sentrons() {
+        assert_small_ring_wiring(3);
+    }
+
+    #[test]
+    fn small_ring_wiring_four_sentrons() {
+        assert_small_ring_wiring(4);
+    }
+
+    #[test]
+    fn zero_size_fleet_is_empty_and_has_no_wiring() {
+        let fleet = Fleet::new(0);
+        assert_eq!(fleet.size(), 0);
+        assert!(fleet.wiring(0).is_none());
+        assert!(fleet.sentron(0).is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "fleet size exceeds the u16 sentron ID address space")]
+    fn oversized_fleet_is_rejected_before_id_aliasing() {
+        // 65,536 sentrons fit IDs 0..=u16::MAX; the next one would wrap.
+        let _ = Fleet::new(u16::MAX as usize + 2);
+    }
+
+    fn assert_small_ring_wiring(size: usize) {
+        let fleet = Fleet::new(size);
+        assert_eq!(fleet.size(), size);
+        for id in 0..size {
+            let wiring = fleet.wiring(id as u16).unwrap();
+            for step in 1..=4usize {
+                let expected_upstream =
+                    ((id as i64 - step as i64).rem_euclid(size as i64)) as u16;
+                let expected_downstream = ((id + step) % size) as u16;
+                assert_eq!(wiring.upstream[step - 1], expected_upstream,
+                           "size={size} id={id} upstream step={step}");
+                assert_eq!(wiring.downstream[step - 1], expected_downstream,
+                           "size={size} id={id} downstream step={step}");
+            }
+        }
     }
 
     #[test]
