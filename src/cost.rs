@@ -5,6 +5,8 @@
 
 use std::time::{Duration, Instant};
 use crate::{Sentron, PhextCoord, SIW};
+use crate::exec::run;
+use crate::memory::Memory;
 use crate::pipes::{DenseOp, SparseOp, CoordOp};
 
 /// Hardware cost parameters
@@ -62,11 +64,13 @@ pub struct BenchResult {
 impl BenchResult {
     /// Operations per second
     pub fn ops_per_sec(&self) -> f64 {
+        if self.ops == 0 { return 0.0; }
         self.ops as f64 / self.duration.as_secs_f64()
     }
 
-    /// Nanoseconds per operation
+    /// Nanoseconds per useful operation; undefined for a NOP-only baseline.
     pub fn ns_per_op(&self) -> f64 {
+        if self.ops == 0 { return f64::INFINITY; }
         self.duration.as_nanos() as f64 / self.ops as f64
     }
 
@@ -115,7 +119,7 @@ impl CostAnalysis {
     }
 }
 
-/// Measure RAM per sentron (stack + default heap allocations)
+/// Estimate RAM per sentron (struct layout + assumed neuron heap), not RSS.
 pub fn measure_sentron_bytes() -> usize {
     // Stack size of the Sentron struct
     let stack = std::mem::size_of::<Sentron>();
@@ -128,39 +132,69 @@ pub fn measure_sentron_bytes() -> usize {
     stack + neuron_heap
 }
 
-/// Run a D-pipe microbenchmark: N iterations of DADD
+/// Run a D-pipe microbenchmark: N **executed** accumulating DADD instructions.
+///
+/// Reuse each preloaded program allocation across iterations. `run()` retires
+/// sentrons, so they must be re-spawned; only real retired D-pipe operations
+/// count toward reported throughput.
 pub fn bench_d_pipe(sentron_count: u32, iters: u64) -> BenchResult {
+    bench_d_pipe_with_state(sentron_count, iters).0
+}
+
+fn bench_d_pipe_with_state(sentron_count: u32, iters: u64) -> (BenchResult, Vec<Sentron>) {
     let mut sentrons: Vec<Sentron> = (0..sentron_count)
         .map(|i| {
             let mut s = Sentron::new(i as u16, PhextCoord::zero(), 0, 0);
             s.regs.general[0] = 1;
             s.regs.general[1] = 1;
+            s.regs.general[2] = 1;
             s
         })
         .collect();
 
     let siw = SIW::new(
-        DenseOp::DADD { rd: 2, rs1: 0, rs2: 1 },
+        DenseOp::DADD { rd: 2, rs1: 2, rs2: 1 },
         SparseOp::SNOP,
         CoordOp::CNOP,
         PhextCoord::zero(),
     );
 
+    for s in sentrons.iter_mut() {
+        s.program = vec![siw.clone()];
+    }
+    let mut mem = Memory::new();
+    let mut retired_siws = 0u64;
+    let mut retired_ops = 0u64;
     let start = Instant::now();
     for _ in 0..iters {
         for s in sentrons.iter_mut() {
-            s.program = vec![siw.clone()];
-            s.ip = 0;
+            // Move (not clone) the program back into a running sentron.
+            let program = std::mem::take(&mut s.program);
+            s.spawn(program);
+            let stats = run(s, &mut mem);
+            retired_siws += stats.siws_retired;
+            retired_ops += stats.ops_retired;
         }
     }
     let duration = start.elapsed();
 
-    BenchResult {
-        label: format!("D-pipe DADD ×{} sentrons", sentron_count),
-        ops: iters * sentron_count as u64,
+    let expected = iters * sentron_count as u64;
+    assert_eq!(retired_siws, expected, "D-pipe benchmark must retire SIWs");
+    assert_eq!(retired_ops, expected, "D-pipe benchmark must execute DADD");
+    if iters > 0 {
+        for s in &sentrons {
+            assert_eq!(s.regs.general[2], 1i64.wrapping_add(iters as i64),
+                       "every DADD must update the destination register");
+        }
+    }
+
+    let result = BenchResult {
+        label: format!("D-pipe executed DADD ×{} sentrons", sentron_count),
+        ops: retired_ops,
         duration,
         sentron_count,
-    }
+    };
+    (result, sentrons)
 }
 
 /// Print a formatted cost report
@@ -179,6 +213,22 @@ pub fn print_report(analysis: &CostAnalysis) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn benchmark_counts_executed_dadd_not_program_allocations() {
+        let (bench, sentrons) = bench_d_pipe_with_state(3, 7);
+        assert_eq!(bench.ops, 21);
+        assert_eq!(bench.sentron_count, 3);
+        assert!(sentrons.iter().all(|s| s.regs.general[2] == 8));
+    }
+
+    #[test]
+    fn zero_iteration_benchmark_reports_zero_ops() {
+        let bench = bench_d_pipe(3, 0);
+        assert_eq!(bench.ops, 0);
+        assert_eq!(bench.ops_per_sec(), 0.0);
+        assert!(bench.ns_per_op().is_infinite());
+    }
 
     #[test]
     fn test_ranch_node_cost() {
