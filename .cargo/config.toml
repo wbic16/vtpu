@@ -1,5 +1,7 @@
 [build]
-# Enable CPU-native features for release builds.
-# This enables AVX2+BMI2 on AWS (Zen 1), AVX-512 on ranch (Zen 4).
-# WARNING: binaries built with this flag are NOT portable.
+# Existing default: CPU-native features for ALL profiles, including tests.
+# CPU-native binaries are NOT portable between different host CPUs.
+# For the canonical portable comparison, override this setting using
+# RUSTFLAGS='' cargo test --all-targets --locked
+# (verified: an explicitly empty RUSTFLAGS omits -C target-cpu=native).
 rustflags = ["-C", "target-cpu=native"]
