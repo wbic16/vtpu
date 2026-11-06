@@ -94,8 +94,14 @@ pub fn coop_fleet_execute(
             fleet.sentron_mut(current as u16).unwrap().state = SentronState::Retired;
         }
 
-        // Flush messages after each quantum (the communication phase)
-        let pending_before = fleet.pending_messages();
+        // Flush messages after each quantum (the communication phase).
+        // CSEND queues into sentron outboxes, *not* the fleet message queue;
+        // pending_messages() alone misses all newly sent values here.
+        let queued_outboxes: usize = (0..n)
+            .filter_map(|i| fleet.sentron(i as u16))
+            .map(|s| s.outbox.len())
+            .sum();
+        let pending_before = fleet.pending_messages() + queued_outboxes;
         fleet.flush();
         let delivered = pending_before.saturating_sub(fleet.pending_messages());
         result.messages_delivered += delivered as u64;
@@ -156,6 +162,7 @@ mod tests {
 
         let mut mem = Memory::new();
         let result = coop_fleet_execute(&mut fleet, &mut mem, 1, 100_000);
+        assert_eq!(result.messages_delivered, 1, "CSEND delivery must be counted from outboxes");
 
         // Sentron 1 should have received 42 in r0
         let val = fleet.sentron(1).unwrap().regs.general[0];

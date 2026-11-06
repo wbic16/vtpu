@@ -1,16 +1,17 @@
-//! W23 — 8-Core Coordination: Cache Crosstalk Exploitation
+//! W23 — 8-Sentron Cooperative Messaging Model
 //!
-//! Uses real vTPU execution (coop_execute) with 8 sentrons.
-//! Measures ops/cycle under coordinated execution with C-Pipe messaging.
+//! Runs 8 virtual sentrons on **one OS thread**. This is not an 8-core or SMT
+//! benchmark. The coordinated workload uses coop_fleet_execute, which drains
+//! CSEND outboxes after each quantum; coop_execute alone does not route them.
+//! Wall-clock timing is measured, while 5 GHz cycle equivalents are modeled.
 //!
-//! Cache exploitation model:
-//!   Physical: SMT siblings share L1/L2. Packed SIWs with CSEND/CRECV
-//!             land in shared cache — coordination is nearly free.
-//!   Temporal: CBAR barriers timed so warmed data is still L1-hot.
-//!
-//! Gate: ≥2.5 ops/cycle under 8-sentron coordinated execution.
+//! CBAR is currently a non-blocking marker; it does not synchronize pairs.
+//! No L1/L2 affinity, physical hardware IPC, or cache-crosstalk claims are
+//! established by this model.
 
-use vtpu_runtime::coop_smt::{coop_execute, CoopConfig, CoopResult};
+use vtpu_runtime::coop_smt::{coop_execute, CoopConfig};
+use vtpu_runtime::coop_fleet::{coop_fleet_execute, CoopFleetResult};
+use vtpu_runtime::fleet::Fleet;
 use vtpu_runtime::memory::Memory;
 use vtpu_runtime::sentron::Sentron;
 use vtpu_runtime::phext_coord::PhextCoord;
@@ -26,17 +27,16 @@ const ITERATIONS: u32 = 50000;
 const MAX_CYCLES: u64 = 10_000_000;
 const GHZ: f64 = 5.0e9;
 
-/// Build a program that exploits all three pipes + C-Pipe coordination.
-/// Each SIW has D-pipe compute, S-pipe prefetch, and C-pipe messaging.
-/// Adjacent sentrons send/recv — exploits SMT sibling L1/L2 sharing.
-fn make_coordinated_program(sentron_id: u16, partner_id: u16, len: usize) -> Vec<SIW> {
+/// Build a synthetic 3-pipe program with C-pipe messages and barrier markers.
+/// These are virtual sentron IDs, not measured SMT siblings.
+fn make_coordinated_program(partner_id: u16, len: usize) -> Vec<SIW> {
     (0..len).map(|i| {
         let rd = (i % 12 + 1) as u8;
         let rs1 = (i % 6 + 1) as u8;
         let rs2 = (i % 5 + 2) as u8;
         let rs3 = (i % 4 + 3) as u8;
 
-        // D-pipe: FMA for maximum arithmetic density (3 ops/cycle target)
+        // D-pipe: synthetic FMA workload
         let d_op = DenseOp::DFMA { rd, rs1, rs2, rs3 };
 
         // S-pipe: prefetch next coordinate (temporal exploitation)
@@ -49,8 +49,7 @@ fn make_coordinated_program(sentron_id: u16, partner_id: u16, len: usize) -> Vec
             SparseOp::SNOP
         };
 
-        // C-pipe: alternate CSEND/CRECV with partner (crosstalk exploitation)
-        // SMT siblings share L1/L2 — CSEND from core 0 warms cache for core 4
+        // C-pipe: alternate CSEND/CRECV with partner (virtual communication).
         let c_op = if i % 8 < 4 {
             CoordOp::CSEND {
                 msg_reg: rs1,
@@ -62,7 +61,7 @@ fn make_coordinated_program(sentron_id: u16, partner_id: u16, len: usize) -> Vec
                 src_sentron: partner_id as u8,
             }
         } else if i % 8 == 7 {
-            // CBAR every 8th SIW — temporal: data from 4 SIWs ago is L1-hot
+            // CBAR is a marker only; this executor does not block for partners.
             CoordOp::CBAR {
                 barrier_id: (i / 8 % 256) as u8,
                 count: 2, // just the SMT pair synchronizes (not all 8)
@@ -94,18 +93,18 @@ fn make_packed_baseline(len: usize) -> Vec<SIW> {
     }).collect()
 }
 
-fn run_coordinated_8core() -> (f64, CoopResult, f64) {
-    let mut mem = Memory::new();
-    
+/// Explicitly select the messaging-capable cooperative execution mode.
+fn execute_coordinated(fleet: &mut Fleet, mem: &mut Memory, config: &CoopConfig) -> CoopFleetResult {
+    coop_fleet_execute(fleet, mem, config.quantum, config.max_cycles)
+}
 
-    // Create 8 sentrons, paired: (0,4), (1,5), (2,6), (3,7)
-    // Pairs model SMT siblings sharing the same physical core
-    let mut sentrons: Vec<Sentron> = (0..N_SENTRONS).map(|i| {
+fn run_coordinated_8_sentrons() -> (f64, CoopFleetResult, f64) {
+    let mut mem = Memory::new();
+    // Eight virtual sentrons, paired: (0,4), (1,5), (2,6), (3,7).
+    let mut fleet = Fleet::new(N_SENTRONS);
+    let programs: Vec<Vec<SIW>> = (0..N_SENTRONS).map(|i| {
         let partner = if i < 4 { i + 4 } else { i - 4 };
-        let coord = PhextCoord::new([i as u16 + 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
-        let mut s = Sentron::new(i as u16, coord, 0, 0);
-        s.spawn(make_coordinated_program(i as u16, partner as u16, PROGRAM_LEN));
-        s
+        make_coordinated_program(partner as u16, PROGRAM_LEN)
     }).collect();
 
     let config = CoopConfig {
@@ -114,17 +113,23 @@ fn run_coordinated_8core() -> (f64, CoopResult, f64) {
     };
 
     let t0 = Instant::now();
-    let mut agg_result = CoopResult::default();
+    let mut agg_result = CoopFleetResult::default();
     for _ in 0..ITERATIONS {
-        // Re-spawn programs each iteration
-        for (i, s) in sentrons.iter_mut().enumerate() {
-            let partner = if i < 4 { i + 4 } else { i - 4 };
-            s.spawn(make_coordinated_program(i as u16, partner as u16, PROGRAM_LEN));
+        // Prevent stale messages from crossing iteration boundaries. spawn()
+        // resets instruction state but intentionally does not reset inboxes.
+        for (i, program) in programs.iter().enumerate() {
+            let s = fleet.sentron_mut(i as u16).expect("sentron exists");
+            s.inbox.clear();
+            s.outbox.clear();
+            s.home = PhextCoord::new([i as u16 + 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+            s.spawn(program.clone());
         }
-        let result = coop_execute(&mut sentrons, &mut mem, &config);
+        let result = execute_coordinated(&mut fleet, &mut mem, &config);
         agg_result.total_retired += result.total_retired;
         agg_result.total_cycles += result.total_cycles;
         agg_result.context_switches += result.context_switches;
+        agg_result.messages_delivered += result.messages_delivered;
+        agg_result.flushes += result.flushes;
     }
     let wall_secs = t0.elapsed().as_secs_f64();
     let wall_cycles = wall_secs * GHZ;
@@ -155,61 +160,87 @@ fn run_baseline_single() -> (f64, u64, f64) {
 }
 
 fn main() {
-    println!("\nvTPU W23 — 8-Core Coordination + Cache Crosstalk Exploitation");
+    println!("\nvTPU W23 — Single-Thread Cooperative Messaging Model");
     println!("=============================================================");
-    println!("Sentrons : {}  (4 SMT pairs)", N_SENTRONS);
+    println!("Sentrons : {} virtual (4 modeled pairs; 1 OS thread)", N_SENTRONS);
     println!("Program  : {} SIWs (D-pipe FMA + S-pipe prefetch + C-pipe msg)", PROGRAM_LEN);
-    println!("Quantum  : {} SIWs/turn (2×4 wiring)", QUANTUM);
+    println!("Quantum  : {} SIWs/turn (fleet flush after each turn)", QUANTUM);
     println!("Iterations: {}", ITERATIONS);
-    println!("Clock    : {} GHz (assumed)", GHZ / 1e9);
+    println!("Clock    : {} GHz (assumed, not measured CPU cycles)", GHZ / 1e9);
     println!();
 
     // Baseline: single sentron, packed SIWs, no coordination
     println!("── Baseline (1 sentron, no coordination) ──");
     let (base_opc, base_ops, base_secs) = run_baseline_single();
-    println!("  ops/cycle : {:.3}", base_opc);
-    println!("  ops total : {}", base_ops);
-    println!("  wall time : {:.3}s", base_secs);
+    println!("  SIWs/assumed cycle : {:.3}", base_opc);
+    println!("  SIWs retired       : {}", base_ops);
+    println!("  wall time          : {:.3}s", base_secs);
     println!();
 
-    // Coordinated: 8 sentrons with C-pipe messaging
-    println!("── Coordinated (8 sentrons, C-pipe crosstalk) ──");
-    let (coord_opc, coord_result, coord_secs) = run_coordinated_8core();
-    println!("  ops/cycle     : {:.3}", coord_opc);
-    println!("  ops total     : {}", coord_result.total_retired);
-    println!("  ctx switches  : {}", coord_result.context_switches);
-    println!("  wall time     : {:.3}s", coord_secs);
+    // Coordinated: eight virtual sentrons with explicit message delivery.
+    println!("── Coordinated (8 virtual sentrons, C-pipe fleet routing) ──");
+    let (coord_opc, coord_result, coord_secs) = run_coordinated_8_sentrons();
+    println!("  SIWs/assumed cycle : {:.3}", coord_opc);
+    println!("  SIWs retired       : {}", coord_result.total_retired);
+    println!("  messages delivered : {}", coord_result.messages_delivered);
+    println!("  fleet flushes      : {}", coord_result.flushes);
+    println!("  context switches   : {}", coord_result.context_switches);
+    println!("  wall time          : {:.3}s", coord_secs);
     println!();
 
-    let speedup = coord_result.total_retired as f64 / base_ops as f64;
-    let opc_ratio = coord_opc / base_opc;
+    let base_rate = base_ops as f64 / base_secs;
+    let coord_rate = coord_result.total_retired as f64 / coord_secs;
 
-    println!("── Results ──");
-    println!("  Throughput  : {:.2}× (8-core vs 1-core)", speedup);
-    println!("  ops/cycle   : {:.3} coordinated vs {:.3} baseline ({:.1}%)",
-        coord_opc, base_opc, opc_ratio * 100.0);
+    println!("── Measured wall-clock rates (different workloads) ──");
+    println!("  Baseline SIWs/s    : {:.0}", base_rate);
+    println!("  Coordinated SIWs/s : {:.0}", coord_rate);
+    println!("  Rate ratio         : {:.2}× (NOT a physical-core speedup)", coord_rate / base_rate);
     println!();
 
-    println!("── Cache Crosstalk Model ──");
-    println!("  SMT pairs share L1/L2 → CSEND/CRECV hit shared cache");
-    println!("  CBAR(count=2) syncs pair locally, not global 8-way");
-    println!("  Temporal: prefetch fills L1 4 SIWs before CRECV reads");
+    println!("── Model limitations ──");
+    println!("  One OS thread; no actual 8-core scheduling or SMT affinity");
+    println!("  CSEND/CRECV routed through Fleet after each quantum");
+    println!("  CBAR(count=2) is a marker, NOT a synchronization barrier");
+    println!("  S-pipe prefetch hints do not prove L1 residency or crosstalk");
     println!();
 
-    // Gate check
-    let gate_opc = coord_opc;
-    if gate_opc >= STRETCH_OPS_CYCLE {
-        println!("✅ W23 STRETCH GOAL: {:.3} ops/cycle ≥ {}", gate_opc, STRETCH_OPS_CYCLE);
-    } else if gate_opc >= TARGET_OPS_CYCLE {
-        println!("✅ W23 GATE PASSED: {:.3} ops/cycle ≥ {}", gate_opc, TARGET_OPS_CYCLE);
-    } else {
-        println!("❌ W23 GATE: {:.3} ops/cycle (target: {TARGET_OPS_CYCLE})", gate_opc);
-        println!("   Note: cooperative SMT (single-thread interleave) has known");
-        println!("   overhead from context switching. The Phase 0 baseline shows");
-        println!("   {:.3} ops/cycle. Coordination cost = {:.1}%", base_opc,
-            (1.0 - opc_ratio) * 100.0);
+    println!("Historical 2.5 SIW/nominal-cycle goal is UNVERIFIED here.");
+    println!("Physical IPC and hardware scaling require separate RG-4 runs.");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn coordinated_w23_path_delivers_messages_between_virtual_sentrons() {
+        let send = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SNOP,
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 },
+            PhextCoord::zero(),
+        );
+        let recv = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SNOP,
+            CoordOp::CRECV { rd: 2, src_sentron: 0 },
+            PhextCoord::zero(),
+        );
+        // Fleet's existing default wiring expects at least four members.
+        let mut fleet = Fleet::new(N_SENTRONS);
+        fleet.sentron_mut(0).unwrap().regs.general[0] = 42;
+        fleet.sentron_mut(0).unwrap().spawn(vec![send]);
+        fleet.sentron_mut(1).unwrap().spawn(vec![recv]);
+
+        let mut mem = Memory::with_capacity(8);
+        let report = execute_coordinated(
+            &mut fleet,
+            &mut mem,
+            &CoopConfig { quantum: 1, max_cycles: 8 },
+        );
+        assert_eq!(report.total_retired, 2);
+        assert_eq!(report.messages_delivered, 1);
+        assert_eq!(fleet.sentron(1).unwrap().regs.general[2], 42);
+        assert!(fleet.sentron(0).unwrap().outbox.is_empty());
     }
-
-    const STRETCH_OPS_CYCLE: f64 = 3.0;
-    const TARGET_OPS_CYCLE: f64 = 2.5;
 }

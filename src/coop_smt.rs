@@ -1,8 +1,10 @@
-//! Cooperative SMT — interleaved multi-sentron execution on a single thread
+//! Cooperative sentron interleaving on a single OS thread
 //!
 //! OS-thread SMT showed 0.08× (overhead-dominated). Cooperative SMT avoids
 //! thread spawn/join overhead by round-robin interleaving sentron execution
 //! within a single thread. Each sentron runs N SIWs before yielding.
+//! This scheduler does not route CSEND outboxes or implement CBAR rendezvous.
+//! Use `coop_fleet_execute` for message delivery after each quantum.
 //!
 //! Target: 1.5-1.8× throughput via pipeline overlap (one sentron's memory
 //! stall is another's compute window).
@@ -40,18 +42,19 @@ pub struct CoopResult {
     pub stats: Vec<ExecStats>,
     /// Total SIWs retired across all sentrons
     pub total_retired: u64,
-    /// Total cycles consumed (wall-clock equivalent)
+    /// Simulated cycles at an ideal one-cycle-per-SIW schedule; NOT CPU cycles
     pub total_cycles: u64,
     /// Number of context switches (yields between sentrons)
     pub context_switches: u64,
-    /// Effective throughput: total_retired / total_cycles
+    /// Virtual SIWs / simulated cycle; NOT measured physical IPC
     pub ops_per_cycle: f64,
 }
 
 /// Run cooperative SMT: interleave multiple sentrons on one thread.
 ///
 /// Round-robin: each sentron executes `config.quantum` SIWs, then yields.
-/// Sentrons that finish or stall (empty inbox on CRECV) are skipped.
+/// Finished sentrons are skipped. CRECV does not stall on an empty inbox;
+/// it reads zero, and no inter-sentron delivery is performed in this mode.
 ///
 /// Returns aggregate stats. The sentrons are modified in place.
 pub fn coop_execute(
@@ -267,6 +270,34 @@ mod tests {
         coop_execute(&mut sentrons, &mut mem, &CoopConfig::default());
         assert_eq!(sentrons[0].outbox.len(), 1);
         assert_eq!(sentrons[0].outbox[0], (1, 42));
+    }
+
+    #[test]
+    fn local_interleaver_does_not_deliver_to_other_sentrons() {
+        // coop_execute is deliberately just an interleaver; W23's message
+        // workload must use coop_fleet_execute to observe deliveries.
+        let send = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SNOP,
+            CoordOp::CSEND { msg_reg: 0, dest_sentron: 1 },
+            PhextCoord::zero(),
+        );
+        let recv = SIW::new(
+            DenseOp::DNOP,
+            SparseOp::SNOP,
+            CoordOp::CRECV { rd: 2, src_sentron: 0 },
+            PhextCoord::zero(),
+        );
+        let mut sentrons = vec![make_sentron(0, vec![send]), make_sentron(1, vec![recv])];
+        sentrons[0].regs.general[0] = 42;
+        let mut mem = Memory::with_capacity(8);
+        let result = coop_execute(&mut sentrons, &mut mem,
+                                  &CoopConfig { quantum: 1, max_cycles: 8 });
+
+        assert_eq!(result.total_retired, 2);
+        assert_eq!(sentrons[0].outbox, vec![(1, 42)]);
+        assert!(sentrons[1].inbox.is_empty());
+        assert_eq!(sentrons[1].regs.general[2], 0); // empty CRECV yields zero
     }
 
     #[test]
